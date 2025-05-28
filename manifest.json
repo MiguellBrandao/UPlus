@@ -2,18 +2,33 @@
   "manifest_version": 3,
   "name": "UdemyPlus",
   "version": "1.0",
-  "description": "Extensão para progresso, metas e organização de cursos da Udemy.",
-  "permissions": ["storage", "scripting", "activeTab"],
-  "host_permissions": ["https://www.udemy.com/*"],
-  "action": {
-    "default_popup": "popup.html",
-    "default_icon": "icon.png"
-  },
+  "permissions": ["scripting", "activeTab"],
+  "host_permissions": ["*://*.udemy.com/*"],
   "content_scripts": [
     {
-      "matches": ["https://www.udemy.com/course/*"],
-      "js": ["content.js"],
-      "css": ["styles.css"]
+      "matches": ["*://*.udemy.com/*"],
+      "css": [
+        "libs/css/bootstrap.min.css",
+        "libs/css/fontawesome.min.css",
+        "libs/css/poppins.css"
+      ],
+      "js": [
+        "libs/js/interact.min.js",
+        "scripts/content.js"
+      ]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "libs/css/fontawesome.min.css",
+        "libs/webfonts/*"
+
+      ],
+      "matches": ["<all_urls>"]
     }
   ]
 }
