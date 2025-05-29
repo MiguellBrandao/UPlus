@@ -1,8 +1,12 @@
 (function () {
   console.log("🚀 UdemyPlus script started");
 
+  const faCSS = document.createElement('link');
+  faCSS.rel = 'stylesheet';
+  faCSS.href = chrome.runtime.getURL('libs/css/fontawesome.min.css');
+  document.head.appendChild(faCSS);
+
   let minimized = false;
-  let initiallyOpenIndex = null;
 
   function formatDuration(minutesTotal, short = false) {
     const h = Math.floor(minutesTotal / 60);
@@ -30,27 +34,6 @@
     }, 800);
   }
 
-  function restoreInitiallyOpenSection() {
-    const buttons = document.querySelectorAll('button.js-panel-toggler');
-    buttons.forEach((btn) => {
-      if (btn.getAttribute('aria-expanded') === 'true') {
-        try { btn.click(); } catch (e) { console.warn("❌ Failed to collapse section:", e); }
-      }
-    });
-
-    if (initiallyOpenIndex !== null && buttons[initiallyOpenIndex]) {
-      const btn = buttons[initiallyOpenIndex];
-      if (btn.getAttribute('aria-expanded') === 'false') {
-        try {
-          btn.click();
-          btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        } catch (e) {
-          console.warn("❌ Failed to reopen initial section:", e);
-        }
-      }
-    }
-  }
-
   function showLoadingOverlay() {
     const base = document.querySelector('.ct-sidebar-course-content');
     const container = base?.parentElement?.parentElement;
@@ -71,7 +54,7 @@
     `;
     const spinner = document.createElement('div');
     spinner.className = 'spinner-border text-light';
-    spinner.style.cssText = `margin-top: 250px; width: 5rem; height: 5rem;`;
+    spinner.style.cssText = `margin-top: 40vh; width: 5rem; height: 5rem;`;
     spinner.role = 'status';
     spinner.innerHTML = `<span class="visually-hidden">Loading...</span>`;
     overlay.appendChild(spinner);
@@ -85,34 +68,43 @@
   }
 
   function extractCourseStats() {
-    const checkboxes = document.querySelectorAll('input[type="checkbox"][data-purpose="progress-toggle-button"]');
+    const sections = document.querySelectorAll('[data-purpose="section-duration"]');
     let totalLessons = 0, completedLessons = 0;
-    let totalMinutes = 0, completedMinutes = 0;
+    let totalMinutes = 0;
+    let completedMinutes = 0;
 
-    checkboxes.forEach(checkbox => {
-      totalLessons++;
-      const isChecked = checkbox.checked;
-      if (isChecked) completedLessons++;
+    sections.forEach(section => {
+      const text = section.innerText.trim();
+      const match = text.match(/(\d+)\s*\/\s*(\d+)\s*\|\s*(?:(\d+)h)?\s*(\d+)m/);
+      if (match) {
+        const completed = parseInt(match[1]);
+        const total = parseInt(match[2]);
+        const h = match[3] ? parseInt(match[3]) : 0;
+        const m = parseInt(match[4]);
+        const minutes = h * 60 + m;
 
-      const wrapper = checkbox.closest('li');
-      if (!wrapper) return;
+        totalLessons += total;
+        completedLessons += completed;
+        totalMinutes += minutes;
 
-      const timeSpan = wrapper.querySelector('.curriculum-item-link--metadata--XK804 span');
-      if (timeSpan) {
-        const text = timeSpan.innerText.trim();
-        const match = text.match(/(?:(\d+)h)?\s*(\d+)m/);
-        if (match) {
-          const h = match[1] ? parseInt(match[1]) : 0;
-          const m = match[2] ? parseInt(match[2]) : 0;
-          const minutes = h * 60 + m;
-          totalMinutes += minutes;
-          if (isChecked) completedMinutes += minutes;
+        if (total > 0) {
+          const avgLessonDuration = minutes / total;
+          completedMinutes += avgLessonDuration * completed;
         }
       }
     });
 
-    const progressPercent = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
-    return { totalLessons, completedLessons, totalMinutes, completedMinutes, progressPercent };
+    const progressPercent = totalLessons > 0
+      ? Math.round((completedLessons / totalLessons) * 100)
+      : 0;
+
+    return {
+      totalLessons,
+      completedLessons,
+      totalMinutes: Math.round(totalMinutes),
+      completedMinutes: Math.round(completedMinutes),
+      progressPercent
+    };
   }
 
   function getCourseTitle() {
@@ -120,27 +112,21 @@
     return titleEl ? titleEl.textContent.trim() : 'Course Title';
   }
 
-  function updatePanelStats(forceExpand = false) {
-    const run = () => {
-      const stats = extractCourseStats();
-      const panel = document.querySelector('#udemy-plus-panel');
-      if (!panel) return;
-      const lessonsEl = panel.querySelector('.stats-lessons');
-      const durationEl = panel.querySelector('.stats-duration');
-      const percentEl = panel.querySelector('.stats-percent');
+  function updatePanelStats() {
+    const stats = extractCourseStats();
 
-      const shortFormat = panel.offsetWidth < 290;
+    const panel = document.querySelector('#udemy-plus-panel');
+    if (!panel) return;
 
-      if (lessonsEl) lessonsEl.innerText = `${stats.completedLessons}/${stats.totalLessons}`;
-      if (durationEl) durationEl.innerText = `${formatDuration(stats.completedMinutes, shortFormat)} / ${formatDuration(stats.totalMinutes, shortFormat)}`;
-      if (percentEl) percentEl.innerText = `${stats.progressPercent}%`;
-    };
+    const lessonsEl = panel.querySelector('.stats-lessons');
+    const durationEl = panel.querySelector('.stats-duration');
+    const percentEl = panel.querySelector('.stats-percent');
 
-    if (forceExpand) {
-      expandAllSections(() => setTimeout(run, 500));
-    } else {
-      run();
-    }
+    const shortFormat = panel.offsetWidth < 340;
+
+    if (lessonsEl) lessonsEl.innerText = `${stats.completedLessons}/${stats.totalLessons}`;
+    if (durationEl) durationEl.innerText = `≈ ${formatDuration(stats.completedMinutes, shortFormat)} / ${formatDuration(stats.totalMinutes, shortFormat)}`;
+    if (percentEl) percentEl.innerText = `${stats.progressPercent}%`;
   }
 
   function markAllLessons(completed) {
@@ -152,31 +138,15 @@
           if (checkbox.checked !== completed) checkbox.click();
         });
         hideLoadingOverlay();
-        updatePanelStats(true);
+        updatePanelStats();
       }, 800);
     });
   }
 
-   function monitorCheckboxChanges() {
+  function monitorCheckboxChanges() {
     document.body.addEventListener('change', (e) => {
       if (e.target && e.target.matches('input[type="checkbox"][data-purpose="progress-toggle-button"]')) {
-        const panel = document.querySelector('#udemy-plus-panel');
-        if (!panel) return;
-
-        const lessonsEl = panel.querySelector('.stats-lessons');
-        const percentEl = panel.querySelector('.stats-percent');
-
-        let [completed, total] = lessonsEl.innerText.match(/\d+/g).map(Number);
-        if (e.target.checked) {
-          completed++;
-        } else {
-          completed = Math.max(0, completed - 1);
-        }
-
-        const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
-
-        lessonsEl.innerText = `${completed}/${total} lessons completed`;
-        percentEl.innerText = `${percent}% completed`;
+        updatePanelStats();
       }
     });
   }
@@ -188,13 +158,7 @@
       if (location.href !== lastUrl) {
         console.log("🎬 Detetada mudança de vídeo via URL");
         lastUrl = location.href;
-
-        expandAllSections(() => {
-          setTimeout(() => {
-            updatePanelStats();
-            restoreInitiallyOpenSection();
-          }, 500);
-        });
+        updatePanelStats();
       }
     }, 1000);
   }
@@ -234,6 +198,8 @@
     const isMinimized = localStorage.getItem('udemyPlusMinimized') === 'true';
     const courseTitle = getCourseTitle();
 
+    lastStats = stats;
+
     const panel = document.createElement('div');
     panel.id = 'udemy-plus-panel';
     panel.style.cssText = `
@@ -268,7 +234,7 @@
             </div>
             <div class="flex-fill text-center rounded p-2">
               <div style="font-size: 1.9rem;" class="stats-duration fw-semibold">
-                ${formatDuration(stats.completedMinutes, savedWidth < 290)} / ${formatDuration(stats.totalMinutes, savedWidth < 290)}
+                ≈ ${formatDuration(stats.completedMinutes, savedWidth < 340)} / ${formatDuration(stats.totalMinutes, savedWidth < 340)}
               </div>
               <div style="font-size: 0.95rem; color: #555;">watched / total</div>
             </div>
@@ -436,25 +402,437 @@
     };
   }
 
-  function tryInsertWithRetries() {
+  function injectTooltipStyles() {
+    const style = document.createElement('style');
+    style.innerHTML = `
+      .udemyplus-icon {
+        position: relative;
+      }
+
+      .udemyplus-tooltip {
+        position: absolute;
+        bottom: 120%;
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: #444;
+        color: #fff;
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-size: 1.05rem;
+        white-space: nowrap;
+        opacity: 0;
+        transition: opacity 0.2s ease-in-out;
+        pointer-events: none;
+      }
+
+      .udemyplus-icon:hover .udemyplus-tooltip {
+        opacity: 1;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+
+  function injectVideoControls() {
+    const bodyContainer = document.querySelector('.app--row--E-WFM.app--body-container--RJZF2');
+    const parent = bodyContainer?.parentElement;
+
+    if (!bodyContainer || !parent || document.querySelector('#udemyplus-video-controls')) return;
+
+    const wrapper = document.createElement('div');
+    wrapper.id = 'udemyplus-video-controls';
+    wrapper.className = 'd-flex justify-content-start py-2';
+    wrapper.style.cssText = `
+      z-index: 9000;
+      position: relative;
+      padding: 0 2.5rem;
+    `;
+
+    const inner = document.createElement('div');
+    inner.className = 'd-flex align-items-center gap-4 px-3';
+    inner.style.cssText = `
+      background: radial-gradient(circle at top left, #ffffff 0%, #e2e2e2 100%);
+      border-radius: 20px;
+      font-size: 1.9rem;
+      color: #333;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      padding-top: 0.7rem;
+      padding-bottom: 0.7rem;
+      position: relative;
+    `;
+
+    inner.innerHTML = `
+      <div class="udemyplus-icon" id="udemyplus-speed-wrapper">
+        <i class="fas fa-tachometer-alt cursor-pointer" id="udemyplus-speed"></i>
+        <div class="udemyplus-tooltip">Speed (1.00x)</div>
+      </div>
+      <div class="udemyplus-icon" id="udemyplus-pip-wrapper">
+        <i class="fas fa-clone cursor-pointer" id="udemyplus-pip"></i>
+        <div class="udemyplus-tooltip">Picture in Picture</div>
+      </div>
+      <div class="udemyplus-icon" id="udemyplus-volume-wrapper">
+        <i class="fas fa-bullhorn cursor-pointer" id="udemyplus-volume"></i>
+        <div class="udemyplus-tooltip">Boost Volume (OFF)</div>
+      </div>
+      <div class="udemyplus-icon" id="udemyplus-disable-next-wrapper">
+        <i class="fas fa-step-forward cursor-pointer" id="udemyplus-disable-next"></i>
+        <div class="udemyplus-tooltip">Auto Skip Delay (OFF)</div>
+      </div>
+      <div class="udemyplus-icon" id="udemyplus-focus-wrapper">
+        <i class="fas fa-eye cursor-pointer" id="udemyplus-focus"></i>
+        <div class="udemyplus-tooltip">Focus Mode (OFF)</div>
+      </div>
+      <div class="udemyplus-icon" id="udemyplus-loop-wrapper">
+        <i class="fas fa-redo cursor-pointer" id="udemyplus-loop"></i>
+        <div class="udemyplus-tooltip">Loop Video (OFF)</div>
+      </div>
+      <div class="udemyplus-icon" id="udemyplus-filters-wrapper">
+        <i class="fas fa-sliders-h cursor-pointer" id="udemyplus-filters-toggle"></i>
+        <div class="udemyplus-tooltip">Video Filters</div>
+      </div>
+
+
+      <!--<div class="udemyplus-icon" id="udemyplus-screenshot-wrapper">
+        <i class="fas fa-camera cursor-pointer" id="udemyplus-screenshot"></i>
+        <div class="udemyplus-tooltip">Screenshot</div>
+      </div>-->
+    `;
+
+    wrapper.appendChild(inner);
+    parent.insertBefore(wrapper, bodyContainer.nextSibling);
+
+    injectTooltipStyles();
+
+    const filterPanel = document.createElement('div');
+    filterPanel.id = 'udemyplus-filter-panel';
+    filterPanel.style.cssText = `
+      position: fixed;
+      top: 100px;
+      right: 5%;
+      z-index: 9999;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.2);
+      width: 250px;
+      border-radius: 12px;
+      display: none;
+      font-family: 'Poppins', sans-serif;
+    `;
+
+    filterPanel.innerHTML = `
+      <div class="card shadow-sm border-0">
+        <div class="card-header bg-dark text-white py-3">
+          <h6 class="m-0" style="font-size: 1.2em;">Video Filters</h6>
+        </div>
+        <div class="card-body p-3">
+          ${[
+            { id: "blur", label: "Blur", max: 200 },
+            { id: "brightness", label: "Brightness", max: 200 },
+            { id: "contrast", label: "Contrast", max: 200 },
+            { id: "grayscale", label: "Grayscale", max: 200 },
+            { id: "hue-rotate", label: "Hue Rotate", max: 360 },
+            { id: "invert", label: "Invert", max: 200 },
+            { id: "saturate", label: "Saturate", max: 200 },
+            { id: "sepia", label: "Sepia", max: 200 }
+          ]
+            .map(
+              ({ id, label, max }) => `
+            <div class="mb-3">
+              <label for="filter-${id}" class="form-label d-flex justify-content-between">
+                <span>${label}</span>
+                <span id="value-${id}">0</span>
+              </label>
+              <input type="range" class="form-range" id="filter-${id}" min="0" max="${max}" value="${["brightness", "contrast", "saturate"].includes(id) ? 100 : 0}">
+            </div>
+          `
+            )
+            .join("")}
+          <button id="filter-reset" class="btn btn-outline-secondary w-100">Reset Filters</button>
+        </div>
+      </div>
+    `;
+
+
+    document.body.appendChild(filterPanel);
+
+    function waitForVideoElement(callback, timeout = 10000) {
+      const start = Date.now();
+      const interval = setInterval(() => {
+        const video = document.querySelector('video');
+        if (video) {
+          clearInterval(interval);
+          callback(video);
+        } else if (Date.now() - start > timeout) {
+          clearInterval(interval);
+          console.warn("⚠️ Timeout esperando pelo elemento <video>");
+        }
+      }, 300);
+    }
+
+
+    waitForVideoElement((video) => {
+      const speedWrapper = document.getElementById('udemyplus-speed-wrapper');
+      const speedTooltip = speedWrapper.querySelector('.udemyplus-tooltip');
+
+      speedWrapper.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const increment = 0.1;
+        const newRate = Math.min(4.0, Math.max(0.1, video.playbackRate + (e.deltaY < 0 ? increment : -increment)));
+        video.playbackRate = parseFloat(newRate.toFixed(2));
+        speedTooltip.textContent = `Speed (${video.playbackRate.toFixed(2)}x)`;
+      });
+
+      speedWrapper.addEventListener('click', () => {
+        video.playbackRate = 1.0;
+        speedTooltip.textContent = `Speed (1.00x)`;
+      });
+
+      document.getElementById('udemyplus-pip').addEventListener('click', () => {
+        if (document.pictureInPictureElement) {
+          document.exitPictureInPicture();
+        } else {
+          video.requestPictureInPicture().catch(console.error);
+        }
+      });
+
+      const volumeIcon = document.getElementById('udemyplus-volume');
+      const volumeTooltip = document.querySelector('#udemyplus-volume-wrapper .udemyplus-tooltip');
+
+      let boosted = false;
+      let audioContext = null;
+      let gainNode = null;
+      let source = null;
+
+      volumeIcon.addEventListener('click', () => {
+        if (!audioContext) {
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          source = audioContext.createMediaElementSource(video);
+          gainNode = audioContext.createGain();
+          gainNode.gain.value = 1;
+          source.connect(gainNode).connect(audioContext.destination);
+        }
+
+        boosted = !boosted;
+        gainNode.gain.value = boosted ? 7 : 1;
+
+        volumeTooltip.textContent = `Boost Volume (${boosted ? 'ON' : 'OFF'})`;
+        volumeIcon.classList.toggle('text-success', boosted);
+      });
+
+      const toggleBtn = document.getElementById('udemyplus-filters-toggle');
+      const filterPanelBox = document.getElementById('udemyplus-filter-panel');
+
+      toggleBtn.addEventListener('click', () => {
+        filterPanelBox.style.display = filterPanelBox.style.display === 'none' ? 'block' : 'none';
+      });
+
+      const filterInputs = filterPanelBox.querySelectorAll('input[type="range"]');
+      const valueDisplays = {};
+      filterInputs.forEach(input => {
+        const id = input.id.replace('filter-', '');
+        valueDisplays[id] = document.getElementById(`value-${id}`);
+      });
+
+      const updateFilters = () => {
+        const values = {};
+        filterInputs.forEach(input => {
+          const id = input.id.replace('filter-', '');
+          const value = input.value;
+          valueDisplays[id].textContent = value;
+          values[id] = id === "hue-rotate" ? `${value}deg` : `${value}${id === "blur" ? "px" : "%"}`;
+        });
+
+        const filterString = Object.entries(values)
+          .map(([key, val]) => `${key}(${val})`)
+          .join(' ');
+
+        video.style.filter = filterString;
+      };
+
+      filterInputs.forEach(input => input.addEventListener('input', updateFilters));
+      updateFilters();
+
+      document.getElementById('filter-reset').addEventListener('click', () => {
+        filterInputs.forEach(input => {
+          const id = input.id.replace('filter-', '');
+          input.value = ["brightness", "contrast", "saturate"].includes(id) ? 100 : 0;
+          valueDisplays[id].textContent = input.value;
+        });
+        updateFilters();
+      });
+
+      if (typeof interact !== 'undefined') {
+        interact('#udemyplus-filter-panel').draggable({
+          allowFrom: '.card-header',
+          listeners: {
+            move(event) {
+              const target = event.target;
+              const dx = event.dx;
+              const dy = event.dy;
+
+              const style = window.getComputedStyle(target);
+              const matrix = new DOMMatrixReadOnly(style.transform);
+              let x = matrix.m41 + dx;
+              let y = matrix.m42 + dy;
+
+              target.style.transform = `translate(${x}px, ${y}px)`;
+            }
+          }
+        });
+
+        filterPanel.style.transform = `translate(0px, 0px)`;
+      }
+
+      const autoSkipBtn = document.getElementById('udemyplus-disable-next');
+      let autoSkipEnabled = false;
+      let skipObserver = null;
+
+      autoSkipBtn.addEventListener('click', () => {
+        autoSkipEnabled = !autoSkipEnabled;
+        autoSkipBtn.classList.toggle('text-success', autoSkipEnabled);
+        const tooltip = autoSkipBtn.nextElementSibling;
+        tooltip.textContent = `Auto Skip Delay (${autoSkipEnabled ? 'ON' : 'OFF'})`;
+
+        if (autoSkipEnabled && loopEnabled) {
+          loopEnabled = false;
+          loopIcon.classList.remove('text-success');
+          loopTooltip.textContent = `Loop Video (OFF)`;
+        }
+
+        if (autoSkipEnabled) {
+          if (skipObserver) skipObserver.disconnect();
+
+          skipObserver = new MutationObserver(() => {
+            const popup = document.querySelector('.interstitial--container--4wumM');
+            if (popup && autoSkipEnabled) {
+              popup.style.display = 'none';
+
+              const current = document.querySelector('li.curriculum-item-link--is-current--2mKk4');
+              if (!current) return;
+
+              let next = current.nextElementSibling;
+              while (next && !next.matches('li[aria-current="false"]')) {
+                next = next.nextElementSibling;
+              }
+
+              if (next) {
+                const playBtn = next.querySelector('button[aria-label^="Reproduzir"]');
+                if (playBtn) playBtn.click();
+              }
+            }
+          });
+
+          skipObserver.observe(document.body, { childList: true, subtree: true });
+        } else if (skipObserver) {
+          skipObserver.disconnect();
+        }
+      });
+
+      let loopEnabled = false;
+      const loopIcon = document.getElementById('udemyplus-loop');
+      const loopTooltip = document.querySelector('#udemyplus-loop-wrapper .udemyplus-tooltip');
+
+      const playBtn = document.querySelector('button[data-purpose="play-button"]');
+
+      loopIcon.addEventListener('click', () => {
+        loopEnabled = !loopEnabled;
+        loopTooltip.textContent = `Loop Video (${loopEnabled ? 'ON' : 'OFF'})`;
+        loopIcon.classList.toggle('text-success', loopEnabled);
+      });
+
+      const loopObserver = new MutationObserver(() => {
+        const popup = document.querySelector('.interstitial--container--4wumM');
+        if (popup && loopEnabled) {
+          const cancelBtn = popup.querySelector('button[data-purpose="cancel-button"]');
+          if (cancelBtn) {
+            cancelBtn.click();
+            const video = document.querySelector('video');
+            if (video) {
+              video.currentTime = 0;
+              if (playBtn) playBtn.click();
+            }
+          }
+        }
+      });
+
+      loopObserver.observe(document.body, { childList: true, subtree: true });
+
+      let focusActive = false;
+      let overlay = null;
+      const focusIcon = document.getElementById('udemyplus-focus');
+      const focusTooltip = document.querySelector('#udemyplus-focus-wrapper .udemyplus-tooltip');
+
+      focusIcon.addEventListener('click', () => {
+        const videoParent = video?.parentElement?.parentElement?.parentElement;
+        const panel = document.getElementById('udemy-plus-panel');
+        const videoControlsInner = document.querySelector('#udemyplus-video-controls > div');
+        const markAllBtn = document.getElementById('complete-all');
+        const resetAllBtn = document.getElementById('reset-all');
+
+        if (!focusActive) {
+          overlay = document.createElement('div');
+          overlay.className = 'udemyplus-focus-overlay';
+          document.body.appendChild(overlay);
+          requestAnimationFrame(() => overlay.style.opacity = '1');
+
+          if (videoParent) videoParent.classList.add('udemyplus-focus-clear');
+
+          if (panel) panel.classList.add('udemyplus-fade-out');
+          if (videoControlsInner) videoControlsInner.classList.add('udemyplus-fade-out');
+
+          if (markAllBtn) markAllBtn.style.display = 'none';
+          if (resetAllBtn) resetAllBtn.style.display = 'none';
+
+          focusTooltip.textContent = `Focus Mode (ON)`;
+          focusIcon.classList.add('text-success');
+          focusActive = true;
+        } else {
+          if (overlay) {
+            overlay.style.opacity = '0';
+            setTimeout(() => overlay.remove(), 400);
+          }
+          if (videoParent) videoParent.classList.remove('udemyplus-focus-clear');
+
+          if (panel) panel.classList.remove('udemyplus-fade-out');
+          if (videoControlsInner) videoControlsInner.classList.remove('udemyplus-fade-out');
+
+          if (markAllBtn) markAllBtn.style.display = '';
+          if (resetAllBtn) resetAllBtn.style.display = '';
+
+          focusTooltip.textContent = `Focus Mode (OFF)`;
+          focusIcon.classList.remove('text-success');
+          focusActive = false;
+        }
+      });
+    });
+  }
+
+  function initPanel() {
     let tries = 0;
     const interval = setInterval(() => {
-      expandAllSections();
-
-      const lessonCount = document.querySelectorAll('div[data-purpose^="curriculum-item-"]').length;
+      const statsReady = document.querySelectorAll('[data-purpose="section-duration"]').length > 0;
       const interactReady = typeof interact !== 'undefined';
 
-      if (lessonCount > 5 && interactReady) {
+      if (statsReady && interactReady) {
         insertStatsPanel();
         monitorCheckboxChanges();
         watchCurrentLessonChange();
         clearInterval(interval);
-        setTimeout(() => restoreInitiallyOpenSection(), 1000);
       }
 
       if (++tries > 30) clearInterval(interval);
     }, 1000);
   }
 
-  tryInsertWithRetries();
+  initPanel();
+
+  const observer = new MutationObserver(() => {
+    const bodyContainer = document.querySelector('.app--row--E-WFM.app--body-container--RJZF2');
+    if (bodyContainer) {
+      injectVideoControls();
+      observer.disconnect();
+    }
+  });
+
+  observer.observe(document.body, { childList: true, subtree: true });
 })();
