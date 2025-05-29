@@ -1,4 +1,3 @@
-import { injectTooltipStyles } from './tooltipStyles.js';
 import { waitForVideoElement } from '../utils/domHelpers.js';
 
 import { createControlsUI, insertFilterPanel } from '../features/video/createControlsUI.js';
@@ -18,7 +17,6 @@ export function initVideoControls() {
 
 	createControlsUI(parent, bodyContainer);
 	insertFilterPanel();
-	injectTooltipStyles();
 
 	waitForVideoElement(video => {
 		setupSpeedControl(video);
