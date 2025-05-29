@@ -1,5 +1,5 @@
 import { expandAllSections } from '../utils/domHelpers.js';
-import { updatePanelStats } from '../features/progress/panel.js';
+import { updatePanelStats } from '../ui/panel.js';
 import { showLoadingOverlay, hideLoadingOverlay } from '../ui/loadingOverlay.js';
 
 export function markAllLessons(completed) {

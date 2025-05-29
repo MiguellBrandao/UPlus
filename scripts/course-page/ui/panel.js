@@ -1,9 +1,9 @@
-import { extractCourseStats, getCourseTitle } from './stats.js';
-import { getCourseIdFromDOM, fetchCourseImage } from '../../services/udemyApi.js';
-import { formatDuration } from '../../utils/formatters.js';
-import { showConfirmModal } from '../../ui/confirmModal.js';
-import { savePanelState, getPanelState, setMinimizedState } from '../../services/storageService.js';
-import { markAllLessons } from '../../services/courseActions.js';
+import { extractCourseStats, getCourseTitle } from '../services/statsService.js';
+import { getCourseIdFromDOM, fetchCourseImage } from '../services/udemyApi.js';
+import { formatDuration } from '../utils/formatters.js';
+import { showConfirmModal } from './confirmModal.js';
+import { savePanelState, getPanelState, setMinimizedState } from '../services/storageService.js';
+import { markAllLessons } from '../services/courseActions.js';
 
 export function updatePanelStats() {
 	const stats = extractCourseStats();

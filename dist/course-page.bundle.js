@@ -1,5 +1,5 @@
 (() => {
-  // scripts/course-page/features/progress/stats.js
+  // scripts/course-page/services/statsService.js
   function extractCourseStats() {
     const sections = document.querySelectorAll('[data-purpose="section-duration"]');
     let totalLessons = 0;
@@ -205,7 +205,7 @@
     });
   }
 
-  // scripts/course-page/features/progress/panel.js
+  // scripts/course-page/ui/panel.js
   function updatePanelStats() {
     const stats = extractCourseStats();
     const panel = document.querySelector("#udemy-plus-panel");
