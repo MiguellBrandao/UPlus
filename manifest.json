@@ -3,16 +3,17 @@
   "name": "UdemyPlus",
   "version": "1.0",
   "permissions": ["scripting", "activeTab"],
-  "host_permissions": ["*://*.udemy.com/*"],
   "content_scripts": [
     {
       "matches": ["*://*.udemy.com/*"],
       "css": [
+        "styles/udemyplus.css",
         "libs/css/bootstrap.min.css",
         "libs/css/fontawesome.min.css",
         "libs/css/poppins.css"
       ],
       "js": [
+        "libs/js/html2canvas.min.js",
         "libs/js/interact.min.js",
         "scripts/content.js"
       ]
