@@ -1,26 +1,27 @@
+import { videoStateService } from '../../services/videoState.js';
+
 export function setupAutoSkip(video) {
 	const autoSkipBtn = document.getElementById('udemyplus-disable-next');
-	let autoSkipEnabled = false;
 	let skipObserver = null;
 
 	autoSkipBtn.addEventListener('click', () => {
-		autoSkipEnabled = !autoSkipEnabled;
-		autoSkipBtn.classList.toggle('text-success', autoSkipEnabled);
-		const tooltip = autoSkipBtn.nextElementSibling;
-		tooltip.textContent = `Auto Skip Delay (${autoSkipEnabled ? 'ON' : 'OFF'})`;
+		const newState = !videoStateService.getAutoSkipEnabled();
 
-		if (autoSkipEnabled && loopEnabled) {
-			loopEnabled = false;
-			loopIcon.classList.remove('text-success');
-			loopTooltip.textContent = `Loop Video (OFF)`;
+		if (newState && videoStateService.getLoopEnabled()) {
+			videoStateService.disableLoop();
 		}
 
-		if (autoSkipEnabled) {
+		videoStateService.setAutoSkipEnabled(newState);
+		autoSkipBtn.classList.toggle('text-success', newState);
+		const tooltip = autoSkipBtn.nextElementSibling;
+		if (tooltip) tooltip.textContent = `Auto Skip Delay (${newState ? 'ON' : 'OFF'})`;
+
+		if (newState) {
 			if (skipObserver) skipObserver.disconnect();
 
 			skipObserver = new MutationObserver(() => {
 				const popup = document.querySelector('.interstitial--container--4wumM');
-				if (popup && autoSkipEnabled) {
+				if (popup && videoStateService.getAutoSkipEnabled()) {
 					popup.style.display = 'none';
 
 					const current = document.querySelector('li.curriculum-item-link--is-current--2mKk4');

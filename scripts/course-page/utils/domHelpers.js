@@ -35,3 +35,21 @@ export function waitForVideoElement(callback, timeout = 10000) {
 		}
 	}, 300);
 }
+
+export function waitForElement(selector, timeout = 10000) {
+	return new Promise((resolve, reject) => {
+		const start = Date.now();
+
+		const interval = setInterval(() => {
+			const element = document.querySelector(selector);
+			if (element) {
+				clearInterval(interval);
+				resolve(element);
+			} else if (Date.now() - start > timeout) {
+				clearInterval(interval);
+				reject(new Error(`Element "${selector}" not found within ${timeout}ms`));
+			}
+		}, 100);
+	});
+}
+

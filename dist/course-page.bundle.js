@@ -165,6 +165,21 @@
       }
     }, 300);
   }
+  function waitForElement(selector, timeout = 1e4) {
+    return new Promise((resolve, reject) => {
+      const start = Date.now();
+      const interval = setInterval(() => {
+        const element = document.querySelector(selector);
+        if (element) {
+          clearInterval(interval);
+          resolve(element);
+        } else if (Date.now() - start > timeout) {
+          clearInterval(interval);
+          reject(new Error(`Element "${selector}" not found within ${timeout}ms`));
+        }
+      }, 100);
+    });
+  }
 
   // scripts/course-page/ui/loadingOverlay.js
   function showLoadingOverlay() {
@@ -379,37 +394,6 @@
     }, 1e3);
   }
 
-  // scripts/course-page/ui/tooltipStyles.js
-  function injectTooltipStyles() {
-    const style = document.createElement("style");
-    style.innerHTML = `
-    .udemyplus-icon {
-      position: relative;
-    }
-
-    .udemyplus-tooltip {
-      position: absolute;
-      bottom: 120%;
-      left: 50%;
-      transform: translateX(-50%);
-      background-color: #444;
-      color: #fff;
-      padding: 4px 8px;
-      border-radius: 6px;
-      font-size: 1.05rem;
-      white-space: nowrap;
-      opacity: 0;
-      transition: opacity 0.2s ease-in-out;
-      pointer-events: none;
-    }
-
-    .udemyplus-icon:hover .udemyplus-tooltip {
-      opacity: 1;
-    }
-  `;
-    document.head.appendChild(style);
-  }
-
   // scripts/course-page/features/video/createControlsUI.js
   function createControlsUI(parent, bodyContainer) {
     const wrapper = document.createElement("div");
@@ -538,26 +522,48 @@
     });
   }
 
+  // scripts/course-page/services/videoState.js
+  var loopEnabled = false;
+  var autoSkipEnabled = false;
+  var videoStateService = {
+    getLoopEnabled: () => loopEnabled,
+    setLoopEnabled: (val) => loopEnabled = val,
+    getAutoSkipEnabled: () => autoSkipEnabled,
+    setAutoSkipEnabled: (val) => autoSkipEnabled = val,
+    disableLoop: () => {
+      loopEnabled = false;
+      const loopIcon = document.getElementById("udemyplus-loop");
+      const loopTooltip = document.querySelector("#udemyplus-loop-wrapper .udemyplus-tooltip");
+      loopIcon?.classList.remove("text-success");
+      if (loopTooltip) loopTooltip.textContent = "Loop Video (OFF)";
+    },
+    disableAutoSkip: () => {
+      autoSkipEnabled = false;
+      const skipBtn = document.getElementById("udemyplus-disable-next");
+      const skipTooltip = skipBtn?.nextElementSibling;
+      skipBtn?.classList.remove("text-success");
+      if (skipTooltip) skipTooltip.textContent = "Auto Skip Delay (OFF)";
+    }
+  };
+
   // scripts/course-page/features/video/autoSkip.js
   function setupAutoSkip(video) {
     const autoSkipBtn = document.getElementById("udemyplus-disable-next");
-    let autoSkipEnabled = false;
     let skipObserver = null;
     autoSkipBtn.addEventListener("click", () => {
-      autoSkipEnabled = !autoSkipEnabled;
-      autoSkipBtn.classList.toggle("text-success", autoSkipEnabled);
-      const tooltip = autoSkipBtn.nextElementSibling;
-      tooltip.textContent = `Auto Skip Delay (${autoSkipEnabled ? "ON" : "OFF"})`;
-      if (autoSkipEnabled && loopEnabled) {
-        loopEnabled = false;
-        loopIcon.classList.remove("text-success");
-        loopTooltip.textContent = `Loop Video (OFF)`;
+      const newState = !videoStateService.getAutoSkipEnabled();
+      if (newState && videoStateService.getLoopEnabled()) {
+        videoStateService.disableLoop();
       }
-      if (autoSkipEnabled) {
+      videoStateService.setAutoSkipEnabled(newState);
+      autoSkipBtn.classList.toggle("text-success", newState);
+      const tooltip = autoSkipBtn.nextElementSibling;
+      if (tooltip) tooltip.textContent = `Auto Skip Delay (${newState ? "ON" : "OFF"})`;
+      if (newState) {
         if (skipObserver) skipObserver.disconnect();
         skipObserver = new MutationObserver(() => {
           const popup = document.querySelector(".interstitial--container--4wumM");
-          if (popup && autoSkipEnabled) {
+          if (popup && videoStateService.getAutoSkipEnabled()) {
             popup.style.display = "none";
             const current = document.querySelector("li.curriculum-item-link--is-current--2mKk4");
             if (!current) return;
@@ -580,25 +586,29 @@
 
   // scripts/course-page/features/video/looping.js
   function setupLooping(video) {
-    let loopEnabled2 = false;
-    const loopIcon2 = document.getElementById("udemyplus-loop");
-    const loopTooltip2 = document.querySelector("#udemyplus-loop-wrapper .udemyplus-tooltip");
-    const playBtn = document.querySelector('button[data-purpose="play-button"]');
-    loopIcon2.addEventListener("click", () => {
-      loopEnabled2 = !loopEnabled2;
-      loopTooltip2.textContent = `Loop Video (${loopEnabled2 ? "ON" : "OFF"})`;
-      loopIcon2.classList.toggle("text-success", loopEnabled2);
+    const loopIcon = document.getElementById("udemyplus-loop");
+    const loopTooltip = document.querySelector("#udemyplus-loop-wrapper .udemyplus-tooltip");
+    loopIcon.addEventListener("click", () => {
+      const newState = !videoStateService.getLoopEnabled();
+      if (newState && videoStateService.getAutoSkipEnabled()) {
+        videoStateService.disableAutoSkip();
+      }
+      videoStateService.setLoopEnabled(newState);
+      loopTooltip.textContent = `Loop Video (${newState ? "ON" : "OFF"})`;
+      loopIcon.classList.toggle("text-success", newState);
     });
     const loopObserver = new MutationObserver(() => {
       const popup = document.querySelector(".interstitial--container--4wumM");
-      if (popup && loopEnabled2) {
+      if (popup && videoStateService.getLoopEnabled()) {
         const cancelBtn = popup.querySelector('button[data-purpose="cancel-button"]');
         if (cancelBtn) {
           cancelBtn.click();
           const video2 = document.querySelector("video");
           if (video2) {
             video2.currentTime = 0;
-            if (playBtn) setTimeout(() => playBtn.click(), 500);
+            waitForElement('button[data-purpose="play-button"]').then((playBtn) => {
+              setTimeout(() => playBtn.click(), 500);
+            }).catch((err) => console.warn(err));
           }
         }
       }
@@ -716,7 +726,6 @@
     if (!bodyContainer || !parent || document.querySelector("#udemyplus-video-controls")) return;
     createControlsUI(parent, bodyContainer);
     insertFilterPanel();
-    injectTooltipStyles();
     waitForVideoElement((video) => {
       setupSpeedControl(video);
       setupPipControl(video);
