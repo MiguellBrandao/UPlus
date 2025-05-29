@@ -2,10 +2,12 @@
   "manifest_version": 3,
   "name": "UdemyPlus",
   "version": "1.0",
+  "description": "__MSG_extensionDescription__",
+  "default_locale": "en",
   "permissions": ["scripting", "activeTab"],
   "content_scripts": [
     {
-      "matches": ["*://*.udemy.com/*"],
+      "matches": ["*://*.udemy.com/course/*/learn/*"],
       "css": [
         "styles/udemyplus.css",
         "libs/css/bootstrap.min.css",
@@ -15,7 +17,7 @@
       "js": [
         "libs/js/html2canvas.min.js",
         "libs/js/interact.min.js",
-        "scripts/content.js"
+        "dist/course-page.bundle.js"
       ]
     }
   ],
@@ -27,7 +29,6 @@
       "resources": [
         "libs/css/fontawesome.min.css",
         "libs/webfonts/*"
-
       ],
       "matches": ["<all_urls>"]
     }

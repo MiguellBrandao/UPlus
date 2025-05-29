@@ -1,0 +1,25 @@
+{
+  "name": "uplus",
+  "version": "1.0.0",
+  "description": "Enhance your Udemy learning with progress tracking, study goals, quick course completion tools, and more - all in one smart extension.",
+  "main": "popup.js",
+  "scripts": {
+    "build": "node build.js",
+    "format": "prettier --write scripts/**/*.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MiguellBrandao/UPlus.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/MiguellBrandao/UPlus/issues"
+  },
+  "homepage": "https://github.com/MiguellBrandao/UPlus#readme",
+  "devDependencies": {
+    "esbuild": "^0.25.5",
+    "prettier": "^3.5.3"
+  }
+}
