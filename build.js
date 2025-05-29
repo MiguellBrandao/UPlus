@@ -1,4 +1,5 @@
-const esbuild = require('esbuild');
+import esbuild from 'esbuild';
+import open from 'open';
 
 esbuild.build({
   entryPoints: ['scripts/course-page/main.js'],
@@ -7,8 +8,10 @@ esbuild.build({
   outfile: 'dist/course-page.bundle.js',
   format: 'iife',
   target: ['chrome111'],
-}).then(() => {
+}).then(async () => {
   console.log('✅ Build completo!');
+  await open('http://reload.extensions');~
+  console.log('🔁 Extensão atualizada!');
 }).catch((err) => {
   console.error('❌ Erro no build:', err);
 });

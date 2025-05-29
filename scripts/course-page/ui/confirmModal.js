@@ -31,21 +31,9 @@ export function showConfirmModal({ title, message, onConfirm }) {
 export function insertConfirmModalHTML() {
 	const confirmModal = document.createElement('div');
 	confirmModal.id = 'udemy-plus-confirm-modal';
-	confirmModal.className = 'modal fade show';
+	confirmModal.className = 'udemy-plus-confirm-modal modal fade show';
 	confirmModal.tabIndex = -1;
 	confirmModal.setAttribute('role', 'dialog');
-	confirmModal.style.cssText = `
-    display: none;
-    background-color: rgba(0,0,0,0.6);
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    z-index: 9998;
-    justify-content: center;
-    align-items: center;
-  `;
 
 	confirmModal.innerHTML = `
     <div class="modal-dialog modal-dialog-centered" style="z-index: 9999;">
