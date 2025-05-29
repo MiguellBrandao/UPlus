@@ -1,4 +1,4 @@
-import { insertStatsPanel } from './features/progress/panel.js';
+import { insertStatsPanel } from './ui/panel.js';
 import { monitorCheckboxChanges, watchCurrentLessonChange } from './observers/statObservers.js';
 
 export function initStatsPanel() {

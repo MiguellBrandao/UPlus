@@ -1,4 +1,4 @@
-import { updatePanelStats } from '../features/progress/panel.js';
+import { updatePanelStats } from '../ui/panel.js';
 
 export function monitorCheckboxChanges() {
 	document.body.addEventListener('change', e => {
