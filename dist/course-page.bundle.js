@@ -2,7 +2,8 @@
   // scripts/course-page/features/progress/stats.js
   function extractCourseStats() {
     const sections = document.querySelectorAll('[data-purpose="section-duration"]');
-    let totalLessons = 0, completedLessons = 0;
+    let totalLessons = 0;
+    let completedLessons = 0;
     let totalMinutes = 0;
     let completedMinutes = 0;
     sections.forEach((section) => {
@@ -93,21 +94,9 @@
   function insertConfirmModalHTML() {
     const confirmModal = document.createElement("div");
     confirmModal.id = "udemy-plus-confirm-modal";
-    confirmModal.className = "modal fade show";
+    confirmModal.className = "udemy-plus-confirm-modal modal fade show";
     confirmModal.tabIndex = -1;
     confirmModal.setAttribute("role", "dialog");
-    confirmModal.style.cssText = `
-    display: none;
-    background-color: rgba(0,0,0,0.6);
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    z-index: 9998;
-    justify-content: center;
-    align-items: center;
-  `;
     confirmModal.innerHTML = `
     <div class="modal-dialog modal-dialog-centered" style="z-index: 9999;">
       <div class="modal-content" style="font-family: 'Poppins', sans-serif;">
@@ -184,21 +173,10 @@
     if (!container) return;
     const overlay = document.createElement("div");
     overlay.id = "udemy-plus-loading";
-    overlay.style.cssText = `
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: ${container.scrollHeight}px;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    justify-content: center;
-    align-items: start;
-    z-index: 10000;
-  `;
+    overlay.className = "udemy-plus-loading";
+    overlay.style.cssText = `height: ${container.scrollHeight}px;`;
     const spinner = document.createElement("div");
-    spinner.className = "spinner-border text-light";
-    spinner.style.cssText = "margin-top: 40vh; width: 5rem; height: 5rem;";
+    spinner.className = "udemy-plus-spinner spinner-border text-light";
     spinner.role = "status";
     spinner.innerHTML = '<span class="visually-hidden">Loading...</span>';
     overlay.appendChild(spinner);
@@ -248,45 +226,39 @@
     const courseTitle = getCourseTitle();
     const panel = document.createElement("div");
     panel.id = "udemy-plus-panel";
+    panel.className = "udemyplus-stats-panel";
     panel.style.cssText = `
-    position: fixed;
-    z-index: 9997;
-    width: ${width}px;
-    font-family: 'Poppins', sans-serif;
-    transform: translate(${x}px, ${y}px);
-    resize: horizontal;
-    overflow: auto;
-    min-width: 250px;
-    max-width: 500px;
-  `;
+		width: ${width}px;
+		transform: translate(${x}px, ${y}px);
+	`;
     panel.innerHTML = `
     <div class="card shadow-lg border-0" style="font-family: 'Poppins', sans-serif;">
-      <div class="card-header d-flex justify-content-between align-items-center bg-dark text-white p-4" style="cursor: move; font-size: 1.4rem;">
+      <div class="card-header udemyplus-panel-header d-flex justify-content-between align-items-center bg-dark text-white p-4">
         <span><i class="fa-solid fa-bolt me-2"></i> UdemyPlus</span>
         <button id="minimize-btn" class="btn p-0 m-0 border-0 bg-transparent text-white" style="font-size: 1.4rem;">${minimized ? "+" : "&minus;"}</button>
       </div>
       <div class="card-body" id="panel-body" style="display: ${minimized ? "none" : "block"};">
         <div class="d-flex align-items-center mb-3">
-          <h5 class="fw-bold m-0" style="font-size: 1.2rem;">${courseTitle}</h5>
+          <h5 class="stats-title fw-bold m-0">${courseTitle}</h5>
         </div>
         <div class="course-image-wrapper text-center mb-3">
-          <img id="course-image" src="" alt="Course Cover" style="max-width: 100%; border-radius: 6px;" />
+          <img id="course-image" class="udemyplus-course-image" src="" alt="Course Cover" />
         </div>
         <div class="d-flex mb-2" style="gap: 10px;">
           <div class="flex-fill text-center rounded p-2">
-            <div style="font-size: 1.9rem;" class="stats-lessons fw-semibold">${stats.completedLessons}/${stats.totalLessons}</div>
-            <div style="font-size: 0.95rem; color: #555;">lessons completed</div>
+            <div class="stats-lessons fw-semibold">${stats.completedLessons}/${stats.totalLessons}</div>
+            <div class="stats-description">lessons completed</div>
           </div>
           <div class="flex-fill text-center rounded p-2">
-            <div style="font-size: 1.9rem;" class="stats-duration fw-semibold">
+            <div class="stats-duration fw-semibold">
               \u2248 ${formatDuration(stats.completedMinutes, width < 340)} / ${formatDuration(stats.totalMinutes, width < 340)}
             </div>
-            <div style="font-size: 0.95rem; color: #555;">watched / total</div>
+            <div class="stats-description">watched / total</div>
           </div>
         </div>
         <div class="text-center mb-4">
-          <div class="stats-percent fw-bold" style="font-size: 2.75rem;">${stats.progressPercent}%</div>
-          <div style="font-size: 0.95rem; color: #555;">completed</div>
+          <div class="stats-percent fw-bold">${stats.progressPercent}%</div>
+          <div class="stats-description">completed</div>
         </div>
         <div class="text-center">
           <button class="btn btn-success px-4 py-2 me-2 fw-semibold" id="complete-all">Mark All</button>
@@ -442,24 +414,9 @@
   function createControlsUI(parent, bodyContainer) {
     const wrapper = document.createElement("div");
     wrapper.id = "udemyplus-video-controls";
-    wrapper.className = "d-flex justify-content-start py-2";
-    wrapper.style.cssText = `
-    z-index: 9000;
-    position: relative;
-    padding: 0 2.5rem;
-  `;
+    wrapper.className = "udemyplus-video-controls d-flex justify-content-start py-2";
     const inner = document.createElement("div");
-    inner.className = "d-flex align-items-center gap-4 px-3";
-    inner.style.cssText = `
-    background: radial-gradient(circle at top left, #ffffff 0%, #e2e2e2 100%);
-    border-radius: 20px;
-    font-size: 1.9rem;
-    color: #333;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    padding-top: 0.7rem;
-    padding-bottom: 0.7rem;
-    position: relative;
-  `;
+    inner.className = "udemyplus-video-controls-inner d-flex align-items-center gap-4 px-3";
     inner.innerHTML = `
     <div class="udemyplus-icon" id="udemyplus-speed-wrapper">
       <i class="fas fa-tachometer-alt cursor-pointer" id="udemyplus-speed"></i>
@@ -496,19 +453,7 @@
   function insertFilterPanel() {
     const filterPanel = document.createElement("div");
     filterPanel.id = "udemyplus-filter-panel";
-    filterPanel.style.cssText = `
-        position: fixed;
-        top: 100px;
-        right: 5%;
-        z-index: 9999;
-        background: #fff;
-        border-radius: 12px;
-        box-shadow: 0 4px 14px rgba(0,0,0,0.2);
-        width: 250px;
-        border-radius: 12px;
-        display: none;
-        font-family: 'Poppins', sans-serif;
-    `;
+    filterPanel.className = "udemyplus-filter-panel";
     filterPanel.innerHTML = `
         <div class="card shadow-sm border-0">
         <div class="card-header bg-dark text-white py-3">

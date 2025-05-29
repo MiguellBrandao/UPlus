@@ -1,25 +1,10 @@
 export function createControlsUI(parent, bodyContainer) {
 	const wrapper = document.createElement('div');
 	wrapper.id = 'udemyplus-video-controls';
-	wrapper.className = 'd-flex justify-content-start py-2';
-	wrapper.style.cssText = `
-    z-index: 9000;
-    position: relative;
-    padding: 0 2.5rem;
-  `;
+	wrapper.className = 'udemyplus-video-controls d-flex justify-content-start py-2';
 
 	const inner = document.createElement('div');
-	inner.className = 'd-flex align-items-center gap-4 px-3';
-	inner.style.cssText = `
-    background: radial-gradient(circle at top left, #ffffff 0%, #e2e2e2 100%);
-    border-radius: 20px;
-    font-size: 1.9rem;
-    color: #333;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    padding-top: 0.7rem;
-    padding-bottom: 0.7rem;
-    position: relative;
-  `;
+	inner.className = 'udemyplus-video-controls-inner d-flex align-items-center gap-4 px-3';
 
 	inner.innerHTML = `
     <div class="udemyplus-icon" id="udemyplus-speed-wrapper">
@@ -59,19 +44,7 @@ export function createControlsUI(parent, bodyContainer) {
 export function insertFilterPanel() {
 	const filterPanel = document.createElement('div');
 	filterPanel.id = 'udemyplus-filter-panel';
-	filterPanel.style.cssText = `
-        position: fixed;
-        top: 100px;
-        right: 5%;
-        z-index: 9999;
-        background: #fff;
-        border-radius: 12px;
-        box-shadow: 0 4px 14px rgba(0,0,0,0.2);
-        width: 250px;
-        border-radius: 12px;
-        display: none;
-        font-family: 'Poppins', sans-serif;
-    `;
+  filterPanel.className = 'udemyplus-filter-panel';
 
 	filterPanel.innerHTML = `
         <div class="card shadow-sm border-0">

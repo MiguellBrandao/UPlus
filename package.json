@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Enhance your Udemy learning with progress tracking, study goals, quick course completion tools, and more - all in one smart extension.",
   "main": "popup.js",
+  "type": "module",
   "scripts": {
     "build": "node build.js",
     "format": "prettier --write scripts/**/*.js"
@@ -20,6 +21,7 @@
   "homepage": "https://github.com/MiguellBrandao/UPlus#readme",
   "devDependencies": {
     "esbuild": "^0.25.5",
+    "open": "^10.1.2",
     "prettier": "^3.5.3"
   }
 }
