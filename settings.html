@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>UdemyPlus Settings</title>
+  <link rel="icon" type="image/png" href="assets/icon-48.png" />
+  <link rel="stylesheet" href="settings.css" />
+</head>
+<body>
+  <main class="settings-root">
+    <header class="hero">
+      <div>
+        <h1>UdemyPlus Settings</h1>
+        <p>Customize behavior for stats, visuals, and confirmations.</p>
+      </div>
+      <img src="assets/icon-48.png" alt="UdemyPlus" />
+    </header>
+
+    <section class="card">
+      <h2>Display</h2>
+      <label class="row toggle-row">
+        <span>Show course image in panel</span>
+        <input id="setting-show-image" type="checkbox" />
+      </label>
+      <label class="row toggle-row">
+        <span>Show completion percentage in panel</span>
+        <input id="setting-show-percent" type="checkbox" />
+      </label>
+      <label class="row toggle-row">
+        <span>Show remaining time in panel</span>
+        <input id="setting-show-remaining" type="checkbox" />
+      </label>
+    </section>
+
+    <section class="card">
+      <h2>Behavior</h2>
+      <label class="row select-row">
+        <span>Stats refresh mode</span>
+        <select id="setting-refresh-mode" class="pretty-select">
+          <option value="auto">Auto refresh on progress changes</option>
+          <option value="manual">Manual refresh only</option>
+        </select>
+      </label>
+      <div class="confirm-actions">
+        <h3>Per-action confirmation state</h3>
+        <p>Choose whether each confirmation is active or ignored.</p>
+        <label class="row select-row">
+          <span>Mark All confirmation</span>
+          <div class="confirm-right">
+            <select id="confirm-markall" class="pretty-select small">
+              <option value="active">Active</option>
+              <option value="ignored">Ignored</option>
+            </select>
+          </div>
+        </label>
+        <label class="row select-row">
+          <span>Reset confirmation</span>
+          <div class="confirm-right">
+            <select id="confirm-reset" class="pretty-select small">
+              <option value="active">Active</option>
+              <option value="ignored">Ignored</option>
+            </select>
+          </div>
+        </label>
+        <label class="row select-row">
+          <span>Refresh confirmation</span>
+          <div class="confirm-right">
+            <select id="confirm-refresh" class="pretty-select small">
+              <option value="active">Active</option>
+              <option value="ignored">Ignored</option>
+            </select>
+          </div>
+        </label>
+      </div>
+    </section>
+
+    <footer class="actions">
+      <button id="save-settings" class="primary-btn">Save settings</button>
+    </footer>
+  </main>
+  <div id="toast-stack" class="toast-stack" aria-live="polite" aria-atomic="false"></div>
+
+  <script src="settings.js"></script>
+</body>
+</html>

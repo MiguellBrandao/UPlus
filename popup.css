@@ -1,0 +1,148 @@
+:root {
+  --bg: #0f0f14;
+  --panel: #1a1a24;
+  --panel-soft: #232334;
+  --txt: #f2f2f7;
+  --muted: #aeaec0;
+  --accent: #9f67ff;
+  --accent-2: #7f3df1;
+  --border: #34344a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  width: 360px;
+  min-height: 420px;
+  background: radial-gradient(circle at top, #29203d 0%, var(--bg) 62%);
+  color: var(--txt);
+  font-family: 'Poppins', 'Segoe UI', sans-serif;
+}
+
+.popup-root {
+  padding: 14px;
+}
+
+.popup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.brand img {
+  width: 22px;
+  height: 22px;
+}
+
+.brand h1 {
+  margin: 0;
+  font-size: 1rem;
+  letter-spacing: 0.2px;
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.icon-btn {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--txt);
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.icon-btn:hover {
+  border-color: var(--accent);
+}
+
+.quick-actions {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.primary-btn {
+  width: 100%;
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: #fff;
+  cursor: pointer;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  font-weight: 600;
+}
+
+.hint {
+  margin: 8px 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.history {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.section-title-row h2 {
+  margin: 0 0 8px;
+  font-size: 0.92rem;
+}
+
+.history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 260px;
+  overflow: auto;
+}
+
+.history-item button {
+  width: 100%;
+  border: 1px solid transparent;
+  background: var(--panel-soft);
+  color: var(--txt);
+  border-radius: 10px;
+  padding: 9px;
+  text-align: left;
+  margin-bottom: 7px;
+  cursor: pointer;
+}
+
+.history-item button:hover {
+  border-color: var(--accent);
+}
+
+.history-item .title {
+  display: block;
+  font-size: 0.82rem;
+  margin-bottom: 4px;
+  line-height: 1.25;
+}
+
+.history-item .meta {
+  display: block;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.hidden {
+  display: none;
+}

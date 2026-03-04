@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>UdemyPlus</title>
+  <link rel="stylesheet" href="libs/css/fontawesome.min.css" />
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <main class="popup-root">
+    <header class="popup-header">
+      <div class="brand">
+        <img src="assets/icon-32.png" alt="UdemyPlus" />
+        <h1>UdemyPlus</h1>
+      </div>
+      <div class="header-actions">
+        <button id="open-shortcuts" class="icon-btn" title="Keyboard shortcuts">
+          <i class="fa-solid fa-keyboard"></i>
+        </button>
+        <button id="open-settings" class="icon-btn" title="Settings">
+          <i class="fa-solid fa-gear"></i>
+        </button>
+      </div>
+    </header>
+
+    <section id="quick-actions" class="quick-actions">
+      <button id="open-course" class="primary-btn">Go to Udemy</button>
+      <p id="context-hint" class="hint"></p>
+    </section>
+
+    <section class="history">
+      <div class="section-title-row">
+        <h2>Recent courses</h2>
+      </div>
+      <ul id="history-list" class="history-list"></ul>
+      <p id="history-empty" class="hint">No course history yet.</p>
+    </section>
+  </main>
+
+  <script src="popup.js"></script>
+</body>
+</html>

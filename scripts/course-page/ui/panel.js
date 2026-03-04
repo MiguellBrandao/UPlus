@@ -1,33 +1,136 @@
-import { extractCourseStats, getCourseTitle } from '../services/statsService.js';
+import { getCourseStats, getCourseTitle, getCacheTtlHours } from '../services/statsService.js';
 import { getCourseIdFromDOM, fetchCourseImage } from '../services/udemyApi.js';
 import { formatDuration } from '../utils/formatters.js';
 import { showConfirmModal } from './confirmModal.js';
 import { savePanelState, getPanelState, setMinimizedState } from '../services/storageService.js';
 import { markAllLessons } from '../services/courseActions.js';
+import {
+  getSettingsSync,
+  getSettings,
+  subscribeToSettings
+} from '../services/settingsStore.js';
 
 const RISK_NOTE =
   'Warning: This action is not officially recommended by Udemy. There are no known reports of bans for using this feature, but use it at your own risk.';
+const DEFAULT_CONFIRM_PREFS = {
+  markAll: true,
+  reset: true,
+  refresh: true
+};
+const CONFIRM_PREFS_KEY = 'uplus_confirm_dialogs';
 
-export function updatePanelStats() {
-  const stats = extractCourseStats();
+let currentSettings = getSettingsSync();
+let unsubscribeSettings = null;
+let currentConfirmPrefs = { ...DEFAULT_CONFIRM_PREFS };
+
+async function loadConfirmPrefs() {
+  try {
+    const result = await chrome.storage.local.get(CONFIRM_PREFS_KEY);
+    currentConfirmPrefs = { ...DEFAULT_CONFIRM_PREFS, ...(result[CONFIRM_PREFS_KEY] || {}) };
+  } catch {
+    currentConfirmPrefs = { ...DEFAULT_CONFIRM_PREFS };
+  }
+
+  return { ...currentConfirmPrefs };
+}
+
+async function setConfirmPreference(actionKey, shouldShow) {
+  currentConfirmPrefs[actionKey] = shouldShow;
+  try {
+    await chrome.storage.local.set({ [CONFIRM_PREFS_KEY]: currentConfirmPrefs });
+  } catch (error) {
+    console.warn('Failed to persist confirm preference:', error);
+  }
+}
+
+function applyPanelSettings(panel, settings) {
+  currentSettings = { ...settings };
+
+  const imageWrapper = panel.querySelector('.course-image-wrapper');
+  if (imageWrapper) {
+    imageWrapper.style.display = settings.showCourseImage ? 'block' : 'none';
+  }
+
+  const percentBlock = panel.querySelector('.stats-percent-block');
+  if (percentBlock) {
+    percentBlock.style.display = settings.showPercentCompleted ? 'block' : 'none';
+  }
+
+  const remainingBlock = panel.querySelector('.stats-remaining-block');
+  if (remainingBlock) {
+    remainingBlock.style.display = settings.showRemainingTime ? 'block' : 'none';
+  }
+}
+
+function applyStatsToPanel(panel, stats) {
+  const lessonsEl = panel.querySelector('.stats-lessons');
+  const durationEl = panel.querySelector('.stats-duration');
+  const remainingEl = panel.querySelector('.stats-remaining-value');
+  const percentEl = panel.querySelector('.stats-percent');
+  const cacheMetaEl = panel.querySelector('#stats-cache-meta');
+  const shortFormat = panel.offsetWidth < 340;
+
+  const remainingMinutes = Math.max(0, stats.totalMinutes - stats.completedMinutes);
+
+  if (lessonsEl) lessonsEl.innerText = `${stats.completedLessons}/${stats.totalLessons}`;
+  if (durationEl) {
+    durationEl.innerText = `~ ${formatDuration(stats.completedMinutes, shortFormat)} / ${formatDuration(stats.totalMinutes, shortFormat)}`;
+  }
+  if (remainingEl) {
+    remainingEl.innerText = formatDuration(remainingMinutes, false);
+  }
+  if (percentEl) percentEl.innerText = `${stats.progressPercent}%`;
+
+  if (cacheMetaEl) {
+    const source = stats.fromCache ? 'cache' : 'live scrape';
+    const updated = new Date(stats.timestamp).toLocaleString('en-US');
+    cacheMetaEl.innerText = `Source: ${source} | Updated: ${updated} | TTL: ${getCacheTtlHours()}h`;
+  }
+}
+
+export async function updatePanelStats({ forceRefresh = false, expandBeforeScrape = true } = {}) {
   const panel = document.querySelector('#udemy-plus-panel');
   if (!panel) return;
 
-  const lessonsEl = panel.querySelector('.stats-lessons');
-  const durationEl = panel.querySelector('.stats-duration');
-  const percentEl = panel.querySelector('.stats-percent');
-  const shortFormat = panel.offsetWidth < 340;
+  const refreshBtn = panel.querySelector('#refresh-stats-btn');
+  if (refreshBtn) refreshBtn.disabled = true;
 
-  if (lessonsEl) lessonsEl.innerText = `${stats.completedLessons}/${stats.totalLessons}`;
-  if (durationEl)
-    durationEl.innerText = `~ ${formatDuration(stats.completedMinutes, shortFormat)} / ${formatDuration(stats.totalMinutes, shortFormat)}`;
-  if (percentEl) percentEl.innerText = `${stats.progressPercent}%`;
+  try {
+    const stats = await getCourseStats({ forceRefresh, expandBeforeScrape });
+    applyStatsToPanel(panel, stats);
+  } catch (error) {
+    console.warn('Failed to update panel stats:', error);
+  } finally {
+    if (refreshBtn) refreshBtn.disabled = false;
+  }
+}
+
+function runBulkAction(completed) {
+  const actionKey = completed ? 'markAll' : 'reset';
+  if (!currentConfirmPrefs[actionKey]) {
+    markAllLessons?.(completed);
+    return;
+  }
+
+  showConfirmModal({
+    title: completed ? 'Confirm Mark All' : 'Confirm Reset',
+    message: completed
+      ? 'Are you sure you want to mark all lessons as completed?'
+      : 'Are you sure you want to reset all lessons?',
+    riskNote: RISK_NOTE,
+    suppressLabel: "Don't show this warning again for this action",
+    onConfirm: ({ dontShowAgain }) => {
+      if (dontShowAgain) {
+        void setConfirmPreference(actionKey, false);
+      }
+      markAllLessons?.(completed);
+    }
+  });
 }
 
 export function insertStatsPanel() {
   if (document.querySelector('#udemy-plus-panel')) return;
 
-  const stats = extractCourseStats();
   const { x, y, width, minimized } = getPanelState();
   const courseTitle = getCourseTitle();
 
@@ -40,10 +143,15 @@ export function insertStatsPanel() {
   `;
 
   panel.innerHTML = `
-    <div class="card shadow-lg border-0" style="font-family: 'Poppins', sans-serif;">
+    <div class="card shadow-lg border-0 uplus-theme-default" style="font-family: 'Poppins', sans-serif;">
       <div class="card-header udemyplus-panel-header d-flex justify-content-between align-items-center bg-dark text-white p-4">
-        <span><i class="fa-solid fa-bolt me-2"></i> UdemyPlus</span>
-        <button id="minimize-btn" class="btn p-0 m-0 border-0 bg-transparent text-white" style="font-size: 1.4rem;">${minimized ? '+' : '&minus;'}</button>
+        <span class="uplus-brand-label"><img src="${chrome.runtime.getURL('assets/icon-32.png')}" alt="UdemyPlus" class="uplus-brand-icon" />UdemyPlus</span>
+        <div class="d-flex align-items-center" style="gap: 8px;">
+          <button id="refresh-stats-btn" class="btn p-0 m-0 border-0 bg-transparent text-white" title="Refresh stats now" style="font-size: 1.2rem;">
+            <i class="fa-solid fa-rotate-right"></i>
+          </button>
+          <button id="minimize-btn" class="btn p-0 m-0 border-0 bg-transparent text-white" style="font-size: 1.4rem;">${minimized ? '+' : '&minus;'}</button>
+        </div>
       </div>
       <div class="card-body" id="panel-body" style="display: ${minimized ? 'none' : 'block'};">
         <div class="d-flex align-items-center mb-3">
@@ -54,42 +162,58 @@ export function insertStatsPanel() {
         </div>
         <div class="d-flex mb-2" style="gap: 10px;">
           <div class="flex-fill text-center rounded p-2">
-            <div class="stats-lessons fw-semibold">${stats.completedLessons}/${stats.totalLessons}</div>
+            <div class="stats-lessons fw-semibold">-/-</div>
             <div class="stats-description">lessons completed</div>
           </div>
           <div class="flex-fill text-center rounded p-2">
-            <div class="stats-duration fw-semibold">
-              ~ ${formatDuration(stats.completedMinutes, width < 340)} / ${formatDuration(stats.totalMinutes, width < 340)}
-            </div>
+            <div class="stats-duration fw-semibold">~ loading...</div>
             <div class="stats-description">watched / total</div>
           </div>
         </div>
-        <div class="text-center mb-4">
-          <div class="stats-percent fw-bold">${stats.progressPercent}%</div>
-          <div class="stats-description">completed</div>
+        <div class="stats-secondary-row mb-2">
+          <div class="text-center rounded p-2 flex-fill stats-percent-block">
+            <div class="stats-percent fw-bold">0%</div>
+            <div class="stats-description">completed</div>
+          </div>
+          <div class="text-center rounded p-2 flex-fill stats-remaining-block">
+            <div class="stats-percent stats-remaining-value fw-bold">0h 0min</div>
+            <div class="stats-description">remaining</div>
+          </div>
         </div>
-        <div class="text-center">
+        <div class="text-center mb-3">
           <button class="btn btn-success px-4 py-2 me-2 fw-semibold" id="complete-all" title="Use at your own risk. Not officially recommended by Udemy.">Mark All</button>
           <button class="btn btn-danger px-4 py-2 fw-semibold" id="reset-all" title="Use at your own risk. Not officially recommended by Udemy.">Reset</button>
-          <p class="udemyplus-risk-note">Not officially recommended by Udemy. No known ban reports, but use at your own risk.</p>
         </div>
+        <p id="stats-cache-meta" class="udemyplus-cache-meta">Source: loading...</p>
       </div>
     </div>
   `;
 
   document.body.appendChild(panel);
 
+  void loadConfirmPrefs();
+  chrome.storage.onChanged.addListener(changes => {
+    const confirmEntry = changes[CONFIRM_PREFS_KEY];
+    if (confirmEntry) {
+      currentConfirmPrefs = { ...DEFAULT_CONFIRM_PREFS, ...(confirmEntry.newValue || {}) };
+    }
+  });
+
+  getSettings().then(settings => applyPanelSettings(panel, settings));
+
+  if (unsubscribeSettings) unsubscribeSettings();
+  unsubscribeSettings = subscribeToSettings(nextSettings => applyPanelSettings(panel, nextSettings));
+
   const courseId = getCourseIdFromDOM();
-  if (courseId) {
-    fetchCourseImage(courseId).then(url => {
-      if (url) {
-        const img = panel.querySelector('#course-image');
-        if (img) img.src = url;
-      }
-    });
-  }
+  fetchCourseImage(courseId).then(url => {
+    if (url) {
+      const img = panel.querySelector('#course-image');
+      if (img) img.src = url;
+    }
+  });
 
   const btn = document.getElementById('minimize-btn');
+  const refreshBtn = document.getElementById('refresh-stats-btn');
   const body = document.getElementById('panel-body');
   const completeAllBtn = document.getElementById('complete-all');
   const resetAllBtn = document.getElementById('reset-all');
@@ -103,26 +227,36 @@ export function insertStatsPanel() {
     });
   }
 
-  if (completeAllBtn) {
-    completeAllBtn.addEventListener('click', () => {
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', () => {
+      if (!currentConfirmPrefs.refresh) {
+        updatePanelStats({ forceRefresh: true, expandBeforeScrape: true });
+        return;
+      }
+
       showConfirmModal({
-        title: 'Confirm Mark All',
-        message: 'Are you sure you want to mark all lessons as completed?',
-        riskNote: RISK_NOTE,
-        onConfirm: () => markAllLessons?.(true)
+        title: 'Confirm Refresh',
+        message:
+          'This will run a full stats refresh and temporarily expand all sections. Continue?',
+        riskNote:
+          '',
+        suppressLabel: "Don't show this warning again for refresh",
+        onConfirm: ({ dontShowAgain }) => {
+          if (dontShowAgain) {
+            void setConfirmPreference('refresh', false);
+          }
+          updatePanelStats({ forceRefresh: true, expandBeforeScrape: true });
+        }
       });
     });
   }
 
+  if (completeAllBtn) {
+    completeAllBtn.addEventListener('click', () => runBulkAction(true));
+  }
+
   if (resetAllBtn) {
-    resetAllBtn.addEventListener('click', () => {
-      showConfirmModal({
-        title: 'Confirm Reset',
-        message: 'Are you sure you want to reset all lessons?',
-        riskNote: RISK_NOTE,
-        onConfirm: () => markAllLessons?.(false)
-      });
-    });
+    resetAllBtn.addEventListener('click', () => runBulkAction(false));
   }
 
   if (typeof interact !== 'undefined') {
@@ -162,9 +296,11 @@ export function insertStatsPanel() {
       const currentX = transformMatch ? parseFloat(transformMatch[1]) : x;
       const currentY = transformMatch ? parseFloat(transformMatch[2]) : y;
       savePanelState({ x: currentX, y: currentY, width: newWidth });
-      updatePanelStats();
+      updatePanelStats({ forceRefresh: false, expandBeforeScrape: false });
     }
   });
 
   resizeObserver.observe(panel);
+
+  updatePanelStats({ forceRefresh: false, expandBeforeScrape: true });
 }

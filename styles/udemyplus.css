@@ -17,6 +17,19 @@
   font-size: 1.4rem;
 }
 
+.uplus-brand-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.15rem;
+}
+
+.uplus-brand-icon {
+  width: 24px;
+  height: 24px;
+  display: inline-block;
+}
+
 .stats-title {
   font-size: 1.2rem;
 }
@@ -32,6 +45,19 @@
 
 .stats-percent {
   font-size: 2.75rem;
+}
+
+.stats-secondary-row {
+  display: flex;
+  gap: 10px;
+}
+
+.stats-secondary-row .stats-percent {
+  font-size: 2.4rem;
+}
+
+.stats-remaining-value {
+  white-space: nowrap;
 }
 
 .stats-description {
@@ -125,11 +151,40 @@
   align-items: center;
 }
 
-.udemyplus-risk-note {
+.udemyplus-cache-meta {
   margin-top: 10px;
   margin-bottom: 0;
-  font-size: 0.78rem;
-  color: #7a4f00;
+  font-size: 0.72rem;
+  color: #666;
+  text-align: center;
+}
+
+.uplus-theme-default {
+  background: #fff;
+  color: #111;
+}
+
+.uplus-theme-minimal {
+  background: #f6f6f8;
+  color: #1c1c22;
+  border: 1px solid #e1e1ea !important;
+  box-shadow: none !important;
+}
+
+.uplus-theme-neon {
+  background: linear-gradient(135deg, #151021 0%, #201437 100%);
+  color: #f0eaff;
+  border: 1px solid #6036b6 !important;
+  box-shadow: 0 10px 28px rgba(129, 74, 248, 0.35) !important;
+}
+
+.uplus-theme-neon .stats-description,
+.uplus-theme-neon .udemyplus-cache-meta {
+  color: #c4b4ef;
+}
+
+.uplus-theme-neon .stats-percent {
+  color: #d7bdff;
 }
 
 /* Loading Overlay */

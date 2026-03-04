@@ -1,62 +1,82 @@
-# UPlus (UdemyPlus)
+﻿# UPlus (UdemyPlus)
 
-UPlus is a Chrome extension that enhances Udemy course pages with:
-- A floating progress panel
-- Bulk lesson actions (mark all / reset)
-- Advanced video controls
+UPlus is a Chrome extension that enhances Udemy learning pages with progress tracking, bulk lesson actions, and video productivity controls.
 
-This version targets Udemy course learning pages (`/course/.../learn/...`) and uses the current curriculum layout.
+It targets Udemy course learning URLs (`/course/.../learn/...`) and is adapted to the current curriculum layout.
 
 ## Features
 
-- Floating, draggable, and resizable stats panel
-- Persisted panel state (`position`, `width`, `minimized`) via `localStorage`
-- Real lesson-based progress tracking:
-  - Completed lessons / total lessons
-  - Watched time / total time
-  - Completion percentage
-- Accurate duration counting from lesson items (ignores items without time, e.g. coding exercises without duration)
-- Auto-refresh of stats when:
-  - A lesson checkbox is toggled
-  - The current lesson URL changes
-- Course image fetch from Udemy API (when `courseId` is available)
-- Bulk actions with confirmation modal:
+- Floating stats panel on course pages
+- Draggable + resizable panel with persisted state (`position`, `width`, `minimized`)
+- Real lesson-based progress metrics:
+  - completed lessons / total lessons
+  - watched time / total time
+  - remaining time
+  - completion percentage
+- Accurate duration parsing from lesson items (ignores items without valid time)
+- Per-course stats cache with 24h TTL
+- Manual stats refresh button
+- Cache/source metadata in panel (`cache` vs `live scrape` + timestamp)
+- Section-state safe scraping:
+  - temporarily expands sections when needed
+  - restores original open/closed state
+  - refocuses the top section that was originally open
+- Bulk actions:
   - `Mark All`
   - `Reset`
-  - Risk warning shown in English (not officially recommended by Udemy; no known ban reports; use at your own risk)
-- Loading overlay during bulk operations
-- Video tools:
-  - Speed control (mouse wheel + click reset to `1.00x`)
+- Confirmation modals for `Mark All`, `Reset`, and `Refresh`
+- Per-action “don’t show again” option in confirmations
+- Loading overlay for bulk operations
+- Course history saved to extension storage (`https://www.udemy.com/course/.../`)
+- Video controls:
+  - speed control via mouse wheel (up to `16x`)
+  - quick speed keys: `S` (slower), `D` (faster)
   - Picture-in-Picture
-  - Volume boost
-  - Auto Skip Delay
-  - Loop mode
-  - Focus mode
+  - volume boost
+  - auto skip delay toggle
+  - loop toggle
+  - focus mode toggle
 
-## Project Scope
+## Popup, Settings, Shortcuts
 
-- Included: course page features (`scripts/course-page`)
-- Excluded: popup UI, explore page features, and video filters
+- **Popup** (`popup.html`):
+  - recent course history list
+  - opens settings page
+  - opens shortcuts page
+  - shows “Go to Udemy” quick action only when current tab is not a Udemy course
+
+- **Settings page** (`settings.html`):
+  - show/hide course image
+  - show/hide completion percentage in panel
+  - show/hide remaining time in panel
+  - auto refresh stats mode
+  - per-action confirmation state (Mark All, Reset, Refresh) with Active/Ignored control
+  - save feedback via stacked toast notifications (top-right, 10s each)
+
+- **Shortcuts page** (`shortcuts.html`):
+  - full keyboard shortcut reference
+
+## Keyboard Shortcuts
+
+On focused Udemy course pages:
+
+- `S`: slow down video
+- `D`: speed up video
+- `Alt+Shift+R`: refresh stats
+- `Alt+Shift+M`: minimize/expand panel
+- `Alt+Shift+F`: toggle focus mode
+- `Alt+Shift+L`: toggle loop
+- `Alt+Shift+S`: toggle auto skip
+- `Alt+Shift+P`: toggle Picture in Picture
+- `Alt+Shift+V`: toggle volume boost
 
 ## Tech Stack
 
-- Manifest V3
-- Vanilla JavaScript (modular source files)
+- Chrome Extension Manifest V3
+- Vanilla JavaScript (modular source)
 - `esbuild` for bundling
 - CSS + Bootstrap + FontAwesome + Poppins
-- `interact.js` for drag behavior
-
-## Structure
-
-```text
-manifest.json
-build.js
-dist/course-page.bundle.js
-scripts/course-page/*
-styles/udemyplus.css
-libs/*
-assets/logo.png
-```
+- `interact.js` for panel drag/resize behavior
 
 ## Build
 
@@ -77,5 +97,6 @@ Build output:
 
 ## Notes
 
-- The extension injects features directly on Udemy learning pages.
-- Some selectors may need future updates if Udemy changes their DOM/classes.
+- DOM selectors may need updates if Udemy changes markup/classes.
+- Some controls depend on Udemy UI elements that can vary by locale/experiment.
+

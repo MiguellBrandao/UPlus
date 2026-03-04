@@ -1,29 +1,62 @@
 {
-  "manifest_version": 3,
-  "name": "UdemyPlus",
-  "version": "1.1.0",
-  "description": "Enhance your Udemy learning with progress tracking and smart video controls.",
-  "permissions": ["activeTab"],
-  "content_scripts": [
-    {
-      "matches": ["*://*.udemy.com/course/*/learn/*"],
-      "css": [
-        "styles/udemyplus.css",
-        "libs/css/bootstrap.min.css",
-        "libs/css/fontawesome.min.css",
-        "libs/css/poppins.css"
-      ],
-      "js": ["libs/js/interact.min.js", "dist/course-page.bundle.js"],
-      "run_at": "document_idle"
-    }
-  ],
-  "action": {
-    "default_title": "UdemyPlus"
-  },
-  "web_accessible_resources": [
-    {
-      "resources": ["libs/css/fontawesome.min.css", "libs/webfonts/*"],
-      "matches": ["<all_urls>"]
-    }
-  ]
+    "manifest_version":  3,
+    "name":  "UdemyPlus",
+    "version":  "1.1.0",
+    "description":  "Enhance your Udemy learning with progress tracking and smart video controls.",
+    "icons":  {
+                  "16":  "assets/icon-16.png",
+                  "32":  "assets/icon-32.png",
+                  "48":  "assets/icon-48.png",
+                  "128":  "assets/icon-128.png"
+              },
+    "permissions":  [
+                        "activeTab",
+                        "storage",
+                        "tabs"
+                    ],
+    "host_permissions":  [
+                             "https://www.udemy.com/*"
+                         ],
+    "content_scripts":  [
+                            {
+                                "matches":  [
+                                                "*://*.udemy.com/course/*/learn/*"
+                                            ],
+                                "css":  [
+                                            "styles/udemyplus.css",
+                                            "libs/css/bootstrap.min.css",
+                                            "libs/css/fontawesome.min.css",
+                                            "libs/css/poppins.css"
+                                        ],
+                                "js":  [
+                                           "libs/js/interact.min.js",
+                                           "dist/course-page.bundle.js"
+                                       ],
+                                "run_at":  "document_idle"
+                            }
+                        ],
+    "action":  {
+                   "default_title":  "UdemyPlus",
+                   "default_popup":  "popup.html",
+                   "default_icon":  {
+                                        "16":  "assets/icon-16.png",
+                                        "32":  "assets/icon-32.png"
+                                    }
+               },
+    "web_accessible_resources":  [
+                                     {
+                                         "resources":  [
+                                                           "libs/css/fontawesome.min.css",
+                                                           "libs/webfonts/*",
+                                                           "assets/icon-16.png",
+                                                           "assets/icon-32.png",
+                                                           "assets/icon-48.png",
+                                                           "assets/icon-128.png"
+                                                       ],
+                                         "matches":  [
+                                                         "\u003call_urls\u003e"
+                                                     ]
+                                     }
+                                 ],
+    "options_page":  "settings.html"
 }

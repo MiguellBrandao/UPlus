@@ -2,20 +2,39 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-export async function expandAllSections(callback) {
-  const togglers = Array.from(
+function getSectionButtons() {
+  const primary = Array.from(
     document.querySelectorAll(
-      '.ud-accordion-panel-toggler, [class*="accordion-panel-module--outer-panel-toggler--"], .js-panel-toggler'
+      'button.js-panel-toggler, .ud-accordion-panel-toggler button, [class*="accordion-panel-module--outer-panel-toggler--"] button'
     )
   );
 
-  for (const toggler of togglers) {
-    const trigger = toggler.tagName === 'BUTTON' ? toggler : toggler.querySelector('button') || toggler;
-    const expanded = trigger.getAttribute('aria-expanded') === 'true';
+  if (primary.length > 0) {
+    return Array.from(new Set(primary));
+  }
+
+  const fallback = Array.from(
+    document.querySelectorAll(
+      '.ud-accordion-panel-toggler, [class*="accordion-panel-module--outer-panel-toggler--"], .js-panel-toggler'
+    )
+  ).map(node => (node.tagName === 'BUTTON' ? node : node.querySelector('button')));
+
+  return Array.from(new Set(fallback.filter(Boolean)));
+}
+
+export async function expandAllSectionsWithState() {
+  const buttons = getSectionButtons();
+  const sectionState = buttons.map(button => ({
+    button,
+    wasExpanded: button.getAttribute('aria-expanded') === 'true'
+  }));
+
+  for (const entry of sectionState) {
+    const expanded = entry.button.getAttribute('aria-expanded') === 'true';
     if (expanded) continue;
 
     try {
-      trigger.click();
+      entry.button.click();
       await sleep(100);
     } catch (e) {
       console.warn('Failed to expand section:', e);
@@ -23,6 +42,40 @@ export async function expandAllSections(callback) {
   }
 
   await sleep(900);
+  return sectionState;
+}
+
+export async function restoreSectionState(sectionState = []) {
+  for (const entry of sectionState) {
+    if (entry.wasExpanded) continue;
+    if (!entry.button?.isConnected) continue;
+
+    const isExpandedNow = entry.button.getAttribute('aria-expanded') === 'true';
+    if (!isExpandedNow) continue;
+
+    try {
+      entry.button.click();
+      await sleep(80);
+    } catch (e) {
+      console.warn('Failed to restore section state:', e);
+    }
+  }
+}
+
+export function focusTopPreviouslyOpenSection(sectionState = []) {
+  const topOpenEntry = sectionState.find(entry => entry.wasExpanded && entry.button?.isConnected);
+  if (!topOpenEntry) return;
+
+  try {
+    topOpenEntry.button.focus({ preventScroll: true });
+    topOpenEntry.button.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } catch (e) {
+    console.warn('Failed to focus top open section:', e);
+  }
+}
+
+export async function expandAllSections(callback) {
+  await expandAllSectionsWithState();
   if (typeof callback === 'function') callback();
 }
 
