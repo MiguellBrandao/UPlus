@@ -1,40 +1,64 @@
 (() => {
   // scripts/course-page/services/statsService.js
+  function parseDurationToMinutes(text) {
+    if (!text) return null;
+    const normalized = text.toLowerCase().replace(/\s+/g, " ").trim();
+    const hasTimeToken = /(hr|hrs|hour|hours|min|mins|minute|minutes|sec|secs|second|seconds)/.test(
+      normalized
+    );
+    if (!hasTimeToken) return null;
+    let minutes = 0;
+    const hoursMatch = normalized.match(/(\d+)\s*(hr|hrs|hour|hours)/);
+    const minutesMatch = normalized.match(/(\d+)\s*(min|mins|minute|minutes)/);
+    const secondsMatch = normalized.match(/(\d+)\s*(sec|secs|second|seconds)/);
+    if (hoursMatch) minutes += Number(hoursMatch[1]) * 60;
+    if (minutesMatch) minutes += Number(minutesMatch[1]);
+    if (secondsMatch && !hoursMatch && !minutesMatch) {
+      minutes += Math.max(1, Math.round(Number(secondsMatch[1]) / 60));
+    }
+    return minutes > 0 ? minutes : null;
+  }
+  function getLessonMinutes(li) {
+    const spans = li.querySelectorAll("span");
+    for (const span of spans) {
+      const minutes = parseDurationToMinutes(span.textContent);
+      if (minutes !== null) return minutes;
+    }
+    return null;
+  }
+  function isCompleted(li) {
+    const checkbox = li.querySelector('input[data-purpose="progress-toggle-button"]');
+    return Boolean(checkbox?.checked);
+  }
   function extractCourseStats() {
-    const sections = document.querySelectorAll('[data-purpose="section-duration"]');
+    const lessons = Array.from(
+      document.querySelectorAll("li.curriculum-item-link--curriculum-item--OVP5S")
+    );
     let totalLessons = 0;
     let completedLessons = 0;
     let totalMinutes = 0;
     let completedMinutes = 0;
-    sections.forEach((section) => {
-      const text = section.innerText.trim();
-      const match = text.match(/(\d+)\s*\/\s*(\d+)\s*\|\s*(?:(\d+)h)?\s*(\d+)m/);
-      if (match) {
-        const completed = parseInt(match[1]);
-        const total = parseInt(match[2]);
-        const h = match[3] ? parseInt(match[3]) : 0;
-        const m = parseInt(match[4]);
-        const minutes = h * 60 + m;
-        totalLessons += total;
-        completedLessons += completed;
-        totalMinutes += minutes;
-        if (total > 0) {
-          const avgLessonDuration = minutes / total;
-          completedMinutes += avgLessonDuration * completed;
-        }
+    lessons.forEach((li) => {
+      const minutes = getLessonMinutes(li);
+      if (minutes === null) return;
+      totalLessons += 1;
+      totalMinutes += minutes;
+      if (isCompleted(li)) {
+        completedLessons += 1;
+        completedMinutes += minutes;
       }
     });
     const progressPercent = totalLessons > 0 ? Math.round(completedLessons / totalLessons * 100) : 0;
     return {
       totalLessons,
       completedLessons,
-      totalMinutes: Math.round(totalMinutes),
-      completedMinutes: Math.round(completedMinutes),
+      totalMinutes,
+      completedMinutes,
       progressPercent
     };
   }
   function getCourseTitle() {
-    const titleEl = document.querySelector("a.header--header-link--X0YLd");
+    const titleEl = document.querySelector("a.header--header-link--X0YLd") || document.querySelector('[data-purpose="course-header-title"]') || document.querySelector('h1[data-purpose="course-header-title"]');
     return titleEl ? titleEl.textContent.trim() : "Course Title";
   }
 
@@ -70,7 +94,7 @@
   }
 
   // scripts/course-page/ui/confirmModal.js
-  function showConfirmModal({ title, message, onConfirm }) {
+  function showConfirmModal({ title, message, riskNote, onConfirm }) {
     let modal = document.getElementById("udemy-plus-confirm-modal");
     if (!modal) {
       insertConfirmModalHTML();
@@ -79,6 +103,10 @@
     modal.style.display = "flex";
     modal.querySelector("#confirm-title").innerText = title;
     modal.querySelector("#confirm-message").innerText = message;
+    const riskEl = modal.querySelector("#confirm-risk-note");
+    if (riskEl) {
+      riskEl.innerText = riskNote || "Warning: This action is not officially recommended by Udemy. There are no known reports of bans for using this feature, but use it at your own risk.";
+    }
     const confirmBtn = modal.querySelector("#confirm-yes");
     const cancelBtn = modal.querySelector("#confirm-no");
     const closeModal = () => modal.style.display = "none";
@@ -105,6 +133,7 @@
         </div>
         <div class="modal-body">
           <p id="confirm-message">Are you sure you want to proceed?</p>
+          <div id="confirm-risk-note" class="alert alert-warning small mb-0"></div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-danger fs-5 px-4" id="confirm-no">Cancel</button>
@@ -132,25 +161,28 @@
   }
 
   // scripts/course-page/utils/domHelpers.js
-  function expandAllSections(callback) {
-    const buttons = document.querySelectorAll("button.js-panel-toggler");
-    let initiallyOpenIndex = null;
-    buttons.forEach((btn, index) => {
-      if (btn.getAttribute("aria-expanded") === "true" && initiallyOpenIndex === null) {
-        initiallyOpenIndex = index;
-      }
-    });
-    const collapsed = document.querySelectorAll('button.js-panel-toggler[aria-expanded="false"]');
-    collapsed.forEach((btn) => {
+  function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+  async function expandAllSections(callback) {
+    const togglers = Array.from(
+      document.querySelectorAll(
+        '.ud-accordion-panel-toggler, [class*="accordion-panel-module--outer-panel-toggler--"], .js-panel-toggler'
+      )
+    );
+    for (const toggler of togglers) {
+      const trigger = toggler.tagName === "BUTTON" ? toggler : toggler.querySelector("button") || toggler;
+      const expanded = trigger.getAttribute("aria-expanded") === "true";
+      if (expanded) continue;
       try {
-        btn.click();
+        trigger.click();
+        await sleep(100);
       } catch (e) {
-        console.warn("\u274C Failed to expand section:", e);
+        console.warn("Failed to expand section:", e);
       }
-    });
-    setTimeout(() => {
-      if (typeof callback === "function") callback();
-    }, 800);
+    }
+    await sleep(900);
+    if (typeof callback === "function") callback();
   }
   function waitForVideoElement(callback, timeout = 1e4) {
     const start = Date.now();
@@ -161,7 +193,7 @@
         callback(video);
       } else if (Date.now() - start > timeout) {
         clearInterval(interval);
-        console.warn("\u26A0\uFE0F Timeout esperando pelo elemento <video>");
+        console.warn("Timeout waiting for <video> element");
       }
     }, 300);
   }
@@ -204,23 +236,29 @@
   }
 
   // scripts/course-page/services/courseActions.js
-  function markAllLessons(completed) {
-    expandAllSections(() => {
-      showLoadingOverlay();
+  function getProgressCheckboxes() {
+    return Array.from(document.querySelectorAll('input[data-purpose="progress-toggle-button"]'));
+  }
+  async function markAllLessons(completed) {
+    showLoadingOverlay();
+    try {
+      await expandAllSections();
+      const checkboxes = getProgressCheckboxes();
+      checkboxes.forEach((checkbox) => {
+        if (checkbox.checked !== completed) checkbox.click();
+      });
       setTimeout(() => {
-        const checkboxes = document.querySelectorAll(
-          'input[data-purpose="progress-toggle-button"]'
-        );
-        checkboxes.forEach((checkbox) => {
-          if (checkbox.checked !== completed) checkbox.click();
-        });
-        hideLoadingOverlay();
         updatePanelStats();
-      }, 800);
-    });
+        hideLoadingOverlay();
+      }, 700);
+    } catch (error) {
+      console.warn("Failed to mark all lessons:", error);
+      hideLoadingOverlay();
+    }
   }
 
   // scripts/course-page/ui/panel.js
+  var RISK_NOTE = "Warning: This action is not officially recommended by Udemy. There are no known reports of bans for using this feature, but use it at your own risk.";
   function updatePanelStats() {
     const stats = extractCourseStats();
     const panel = document.querySelector("#udemy-plus-panel");
@@ -231,7 +269,7 @@
     const shortFormat = panel.offsetWidth < 340;
     if (lessonsEl) lessonsEl.innerText = `${stats.completedLessons}/${stats.totalLessons}`;
     if (durationEl)
-      durationEl.innerText = `\u2248 ${formatDuration(stats.completedMinutes, shortFormat)} / ${formatDuration(stats.totalMinutes, shortFormat)}`;
+      durationEl.innerText = `~ ${formatDuration(stats.completedMinutes, shortFormat)} / ${formatDuration(stats.totalMinutes, shortFormat)}`;
     if (percentEl) percentEl.innerText = `${stats.progressPercent}%`;
   }
   function insertStatsPanel() {
@@ -243,9 +281,9 @@
     panel.id = "udemy-plus-panel";
     panel.className = "udemyplus-stats-panel";
     panel.style.cssText = `
-		width: ${width}px;
-		transform: translate(${x}px, ${y}px);
-	`;
+    width: ${width}px;
+    transform: translate(${x}px, ${y}px);
+  `;
     panel.innerHTML = `
     <div class="card shadow-lg border-0" style="font-family: 'Poppins', sans-serif;">
       <div class="card-header udemyplus-panel-header d-flex justify-content-between align-items-center bg-dark text-white p-4">
@@ -266,7 +304,7 @@
           </div>
           <div class="flex-fill text-center rounded p-2">
             <div class="stats-duration fw-semibold">
-              \u2248 ${formatDuration(stats.completedMinutes, width < 340)} / ${formatDuration(stats.totalMinutes, width < 340)}
+              ~ ${formatDuration(stats.completedMinutes, width < 340)} / ${formatDuration(stats.totalMinutes, width < 340)}
             </div>
             <div class="stats-description">watched / total</div>
           </div>
@@ -276,8 +314,9 @@
           <div class="stats-description">completed</div>
         </div>
         <div class="text-center">
-          <button class="btn btn-success px-4 py-2 me-2 fw-semibold" id="complete-all">Mark All</button>
-          <button class="btn btn-danger px-4 py-2 fw-semibold" id="reset-all">Reset</button>
+          <button class="btn btn-success px-4 py-2 me-2 fw-semibold" id="complete-all" title="Use at your own risk. Not officially recommended by Udemy.">Mark All</button>
+          <button class="btn btn-danger px-4 py-2 fw-semibold" id="reset-all" title="Use at your own risk. Not officially recommended by Udemy.">Reset</button>
+          <p class="udemyplus-risk-note">Not officially recommended by Udemy. No known ban reports, but use at your own risk.</p>
         </div>
       </div>
     </div>
@@ -309,6 +348,7 @@
         showConfirmModal({
           title: "Confirm Mark All",
           message: "Are you sure you want to mark all lessons as completed?",
+          riskNote: RISK_NOTE,
           onConfirm: () => markAllLessons?.(true)
         });
       });
@@ -318,6 +358,7 @@
         showConfirmModal({
           title: "Confirm Reset",
           message: "Are you sure you want to reset all lessons?",
+          riskNote: RISK_NOTE,
           onConfirm: () => markAllLessons?.(false)
         });
       });
@@ -330,21 +371,19 @@
             const target = event.target;
             const dx = event.dx;
             const dy = event.dy;
-            const match = target.style.transform.match(
-              /translate\(([-\d.]+)px,\s*([-\d.]+)px\)/
-            );
-            let x2 = match ? parseFloat(match[1]) + dx : dx;
-            let y2 = match ? parseFloat(match[2]) + dy : dy;
+            const match = target.style.transform.match(/translate\(([-\d.]+)px,\s*([-\d.]+)px\)/);
+            let nextX = match ? parseFloat(match[1]) + dx : dx;
+            let nextY = match ? parseFloat(match[2]) + dy : dy;
             const panelRect = target.getBoundingClientRect();
             const padding = 5;
-            if (x2 < padding) x2 = padding;
-            if (x2 + panelRect.width > window.innerWidth - padding)
-              x2 = window.innerWidth - panelRect.width - padding;
-            if (y2 < padding) y2 = padding;
-            if (y2 + panelRect.height > window.innerHeight - padding)
-              y2 = window.innerHeight - panelRect.height - padding;
-            target.style.transform = `translate(${x2}px, ${y2}px)`;
-            savePanelState({ x: x2, y: y2 });
+            if (nextX < padding) nextX = padding;
+            if (nextX + panelRect.width > window.innerWidth - padding)
+              nextX = window.innerWidth - panelRect.width - padding;
+            if (nextY < padding) nextY = padding;
+            if (nextY + panelRect.height > window.innerHeight - padding)
+              nextY = window.innerHeight - panelRect.height - padding;
+            target.style.transform = `translate(${nextX}px, ${nextY}px)`;
+            savePanelState({ x: nextX, y: nextY });
           }
         }
       });
@@ -352,7 +391,10 @@
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const newWidth = Math.round(entry.contentRect.width);
-        savePanelState({ x, y, width: newWidth });
+        const transformMatch = panel.style.transform.match(/translate\(([-\d.]+)px,\s*([-\d.]+)px\)/);
+        const currentX = transformMatch ? parseFloat(transformMatch[1]) : x;
+        const currentY = transformMatch ? parseFloat(transformMatch[2]) : y;
+        savePanelState({ x: currentX, y: currentY, width: newWidth });
         updatePanelStats();
       }
     });
@@ -382,16 +424,18 @@
   function initStatsPanel() {
     let tries = 0;
     const interval = setInterval(() => {
-      const statsReady = document.querySelectorAll('[data-purpose="section-duration"]').length > 0;
+      const hasCurriculum = document.querySelectorAll("li.curriculum-item-link--curriculum-item--OVP5S").length > 0;
       const interactReady = typeof interact !== "undefined";
-      if (statsReady && interactReady) {
-        insertStatsPanel();
-        monitorCheckboxChanges();
-        watchCurrentLessonChange();
+      if (hasCurriculum && interactReady) {
         clearInterval(interval);
+        expandAllSections(() => {
+          insertStatsPanel();
+          monitorCheckboxChanges();
+          watchCurrentLessonChange();
+        });
       }
-      if (++tries > 30) clearInterval(interval);
-    }, 1e3);
+      if (++tries > 60) clearInterval(interval);
+    }, 500);
   }
 
   // scripts/course-page/features/video/createControlsUI.js
@@ -426,49 +470,9 @@
       <i class="fas fa-redo cursor-pointer" id="udemyplus-loop"></i>
       <div class="udemyplus-tooltip">Loop Video (OFF)</div>
     </div>
-    <div class="udemyplus-icon" id="udemyplus-filters-wrapper">
-      <i class="fas fa-sliders-h cursor-pointer" id="udemyplus-filters-toggle"></i>
-      <div class="udemyplus-tooltip">Video Filters</div>
-    </div>
   `;
     wrapper.appendChild(inner);
     parent.insertBefore(wrapper, bodyContainer.nextSibling);
-  }
-  function insertFilterPanel() {
-    const filterPanel = document.createElement("div");
-    filterPanel.id = "udemyplus-filter-panel";
-    filterPanel.className = "udemyplus-filter-panel";
-    filterPanel.innerHTML = `
-        <div class="card shadow-sm border-0">
-        <div class="card-header bg-dark text-white py-3">
-            <h6 class="m-0" style="font-size: 1.2em;">Video Filters</h6>
-        </div>
-        <div class="card-body p-3">
-            ${[
-      { id: "blur", label: "Blur", max: 200 },
-      { id: "brightness", label: "Brightness", max: 200 },
-      { id: "contrast", label: "Contrast", max: 200 },
-      { id: "grayscale", label: "Grayscale", max: 200 },
-      { id: "hue-rotate", label: "Hue Rotate", max: 360 },
-      { id: "invert", label: "Invert", max: 200 },
-      { id: "saturate", label: "Saturate", max: 200 },
-      { id: "sepia", label: "Sepia", max: 200 }
-    ].map(
-      ({ id, label, max }) => `
-            <div class="mb-3">
-                <label for="filter-${id}" class="form-label d-flex justify-content-between">
-                <span>${label}</span>
-                <span id="value-${id}">0</span>
-                </label>
-                <input type="range" class="form-range" id="filter-${id}" min="0" max="${max}" value="${["brightness", "contrast", "saturate"].includes(id) ? 100 : 0}">
-            </div>
-            `
-    ).join("")}
-            <button id="filter-reset" class="btn btn-outline-secondary w-100">Reset Filters</button>
-        </div>
-        </div>
-    `;
-    document.body.appendChild(filterPanel);
   }
 
   // scripts/course-page/features/video/speedControl.js
@@ -658,74 +662,12 @@
     });
   }
 
-  // scripts/course-page/features/video/videoFilters.js
-  function setupVideoFilters(video) {
-    const toggleBtn = document.getElementById("udemyplus-filters-toggle");
-    const filterPanelBox = document.getElementById("udemyplus-filter-panel");
-    toggleBtn.addEventListener("click", () => {
-      const isVisible = filterPanelBox.style.display !== "none";
-      if (isVisible) {
-        filterPanelBox.style.display = "none";
-        toggleBtn.classList.remove("text-success");
-      } else {
-        filterPanelBox.style.display = "block";
-        toggleBtn.classList.add("text-success");
-      }
-    });
-    const filterInputs = filterPanelBox.querySelectorAll('input[type="range"]');
-    const valueDisplays = {};
-    filterInputs.forEach((input) => {
-      const id = input.id.replace("filter-", "");
-      valueDisplays[id] = document.getElementById(`value-${id}`);
-    });
-    const updateFilters = () => {
-      const values = {};
-      filterInputs.forEach((input) => {
-        const id = input.id.replace("filter-", "");
-        const value = input.value;
-        valueDisplays[id].textContent = value;
-        values[id] = id === "hue-rotate" ? `${value}deg` : `${value}${id === "blur" ? "px" : "%"}`;
-      });
-      const filterString = Object.entries(values).map(([key, val]) => `${key}(${val})`).join(" ");
-      video.style.filter = filterString;
-    };
-    filterInputs.forEach((input) => input.addEventListener("input", updateFilters));
-    updateFilters();
-    document.getElementById("filter-reset").addEventListener("click", () => {
-      filterInputs.forEach((input) => {
-        const id = input.id.replace("filter-", "");
-        input.value = ["brightness", "contrast", "saturate"].includes(id) ? 100 : 0;
-        valueDisplays[id].textContent = input.value;
-      });
-      updateFilters();
-    });
-    if (typeof interact !== "undefined") {
-      interact("#udemyplus-filter-panel").draggable({
-        allowFrom: ".card-header",
-        listeners: {
-          move(event) {
-            const target = event.target;
-            const dx = event.dx;
-            const dy = event.dy;
-            const style = window.getComputedStyle(target);
-            const matrix = new DOMMatrixReadOnly(style.transform);
-            let x = matrix.m41 + dx;
-            let y = matrix.m42 + dy;
-            target.style.transform = `translate(${x}px, ${y}px)`;
-          }
-        }
-      });
-      document.getElementById("udemyplus-filter-panel").style.transform = `translate(0px, 0px)`;
-    }
-  }
-
   // scripts/course-page/ui/injectControlsUI.js
   function initVideoControls() {
     const bodyContainer = document.querySelector(".app--row--E-WFM.app--body-container--RJZF2");
     const parent = bodyContainer?.parentElement;
     if (!bodyContainer || !parent || document.querySelector("#udemyplus-video-controls")) return;
     createControlsUI(parent, bodyContainer);
-    insertFilterPanel();
     waitForVideoElement((video) => {
       setupSpeedControl(video);
       setupPipControl(video);
@@ -733,7 +675,6 @@
       setupAutoSkip(video);
       setupLooping(video);
       setupFocusMode(video);
-      setupVideoFilters(video);
     });
   }
 

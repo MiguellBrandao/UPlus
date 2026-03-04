@@ -1,4 +1,4 @@
-export function showConfirmModal({ title, message, onConfirm }) {
+export function showConfirmModal({ title, message, riskNote, onConfirm }) {
 	let modal = document.getElementById('udemy-plus-confirm-modal');
 
 	if (!modal) {
@@ -10,6 +10,12 @@ export function showConfirmModal({ title, message, onConfirm }) {
 
 	modal.querySelector('#confirm-title').innerText = title;
 	modal.querySelector('#confirm-message').innerText = message;
+	const riskEl = modal.querySelector('#confirm-risk-note');
+	if (riskEl) {
+		riskEl.innerText =
+			riskNote ||
+			'Warning: This action is not officially recommended by Udemy. There are no known reports of bans for using this feature, but use it at your own risk.';
+	}
 
 	const confirmBtn = modal.querySelector('#confirm-yes');
 	const cancelBtn = modal.querySelector('#confirm-no');
@@ -43,6 +49,7 @@ export function insertConfirmModalHTML() {
         </div>
         <div class="modal-body">
           <p id="confirm-message">Are you sure you want to proceed?</p>
+          <div id="confirm-risk-note" class="alert alert-warning small mb-0"></div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-danger fs-5 px-4" id="confirm-no">Cancel</button>

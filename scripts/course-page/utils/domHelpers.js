@@ -1,55 +1,58 @@
-export function expandAllSections(callback) {
-	const buttons = document.querySelectorAll('button.js-panel-toggler');
-	let initiallyOpenIndex = null;
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
-	buttons.forEach((btn, index) => {
-		if (btn.getAttribute('aria-expanded') === 'true' && initiallyOpenIndex === null) {
-			initiallyOpenIndex = index;
-		}
-	});
+export async function expandAllSections(callback) {
+  const togglers = Array.from(
+    document.querySelectorAll(
+      '.ud-accordion-panel-toggler, [class*="accordion-panel-module--outer-panel-toggler--"], .js-panel-toggler'
+    )
+  );
 
-	const collapsed = document.querySelectorAll('button.js-panel-toggler[aria-expanded="false"]');
-	collapsed.forEach(btn => {
-		try {
-			btn.click();
-		} catch (e) {
-			console.warn('❌ Failed to expand section:', e);
-		}
-	});
+  for (const toggler of togglers) {
+    const trigger = toggler.tagName === 'BUTTON' ? toggler : toggler.querySelector('button') || toggler;
+    const expanded = trigger.getAttribute('aria-expanded') === 'true';
+    if (expanded) continue;
 
-	setTimeout(() => {
-		if (typeof callback === 'function') callback();
-	}, 800);
+    try {
+      trigger.click();
+      await sleep(100);
+    } catch (e) {
+      console.warn('Failed to expand section:', e);
+    }
+  }
+
+  await sleep(900);
+  if (typeof callback === 'function') callback();
 }
 
 export function waitForVideoElement(callback, timeout = 10000) {
-	const start = Date.now();
-	const interval = setInterval(() => {
-		const video = document.querySelector('video');
-		if (video) {
-			clearInterval(interval);
-			callback(video);
-		} else if (Date.now() - start > timeout) {
-			clearInterval(interval);
-			console.warn('⚠️ Timeout esperando pelo elemento <video>');
-		}
-	}, 300);
+  const start = Date.now();
+  const interval = setInterval(() => {
+    const video = document.querySelector('video');
+    if (video) {
+      clearInterval(interval);
+      callback(video);
+    } else if (Date.now() - start > timeout) {
+      clearInterval(interval);
+      console.warn('Timeout waiting for <video> element');
+    }
+  }, 300);
 }
 
 export function waitForElement(selector, timeout = 10000) {
-	return new Promise((resolve, reject) => {
-		const start = Date.now();
+  return new Promise((resolve, reject) => {
+    const start = Date.now();
 
-		const interval = setInterval(() => {
-			const element = document.querySelector(selector);
-			if (element) {
-				clearInterval(interval);
-				resolve(element);
-			} else if (Date.now() - start > timeout) {
-				clearInterval(interval);
-				reject(new Error(`Element "${selector}" not found within ${timeout}ms`));
-			}
-		}, 100);
-	});
+    const interval = setInterval(() => {
+      const element = document.querySelector(selector);
+      if (element) {
+        clearInterval(interval);
+        resolve(element);
+      } else if (Date.now() - start > timeout) {
+        clearInterval(interval);
+        reject(new Error(`Element "${selector}" not found within ${timeout}ms`));
+      }
+    }, 100);
+  });
 }
-

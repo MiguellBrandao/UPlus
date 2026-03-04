@@ -5,38 +5,41 @@ import { showConfirmModal } from './confirmModal.js';
 import { savePanelState, getPanelState, setMinimizedState } from '../services/storageService.js';
 import { markAllLessons } from '../services/courseActions.js';
 
+const RISK_NOTE =
+  'Warning: This action is not officially recommended by Udemy. There are no known reports of bans for using this feature, but use it at your own risk.';
+
 export function updatePanelStats() {
-	const stats = extractCourseStats();
-	const panel = document.querySelector('#udemy-plus-panel');
-	if (!panel) return;
+  const stats = extractCourseStats();
+  const panel = document.querySelector('#udemy-plus-panel');
+  if (!panel) return;
 
-	const lessonsEl = panel.querySelector('.stats-lessons');
-	const durationEl = panel.querySelector('.stats-duration');
-	const percentEl = panel.querySelector('.stats-percent');
-	const shortFormat = panel.offsetWidth < 340;
+  const lessonsEl = panel.querySelector('.stats-lessons');
+  const durationEl = panel.querySelector('.stats-duration');
+  const percentEl = panel.querySelector('.stats-percent');
+  const shortFormat = panel.offsetWidth < 340;
 
-	if (lessonsEl) lessonsEl.innerText = `${stats.completedLessons}/${stats.totalLessons}`;
-	if (durationEl)
-		durationEl.innerText = `≈ ${formatDuration(stats.completedMinutes, shortFormat)} / ${formatDuration(stats.totalMinutes, shortFormat)}`;
-	if (percentEl) percentEl.innerText = `${stats.progressPercent}%`;
+  if (lessonsEl) lessonsEl.innerText = `${stats.completedLessons}/${stats.totalLessons}`;
+  if (durationEl)
+    durationEl.innerText = `~ ${formatDuration(stats.completedMinutes, shortFormat)} / ${formatDuration(stats.totalMinutes, shortFormat)}`;
+  if (percentEl) percentEl.innerText = `${stats.progressPercent}%`;
 }
 
 export function insertStatsPanel() {
-	if (document.querySelector('#udemy-plus-panel')) return;
+  if (document.querySelector('#udemy-plus-panel')) return;
 
-	const stats = extractCourseStats();
-	const { x, y, width, minimized } = getPanelState();
-	const courseTitle = getCourseTitle();
+  const stats = extractCourseStats();
+  const { x, y, width, minimized } = getPanelState();
+  const courseTitle = getCourseTitle();
 
-	const panel = document.createElement('div');
-	panel.id = 'udemy-plus-panel';
-	panel.className = 'udemyplus-stats-panel';
-	panel.style.cssText = `
-		width: ${width}px;
-		transform: translate(${x}px, ${y}px);
-	`;
+  const panel = document.createElement('div');
+  panel.id = 'udemy-plus-panel';
+  panel.className = 'udemyplus-stats-panel';
+  panel.style.cssText = `
+    width: ${width}px;
+    transform: translate(${x}px, ${y}px);
+  `;
 
-	panel.innerHTML = `
+  panel.innerHTML = `
     <div class="card shadow-lg border-0" style="font-family: 'Poppins', sans-serif;">
       <div class="card-header udemyplus-panel-header d-flex justify-content-between align-items-center bg-dark text-white p-4">
         <span><i class="fa-solid fa-bolt me-2"></i> UdemyPlus</span>
@@ -56,7 +59,7 @@ export function insertStatsPanel() {
           </div>
           <div class="flex-fill text-center rounded p-2">
             <div class="stats-duration fw-semibold">
-              ≈ ${formatDuration(stats.completedMinutes, width < 340)} / ${formatDuration(stats.totalMinutes, width < 340)}
+              ~ ${formatDuration(stats.completedMinutes, width < 340)} / ${formatDuration(stats.totalMinutes, width < 340)}
             </div>
             <div class="stats-description">watched / total</div>
           </div>
@@ -66,98 +69,102 @@ export function insertStatsPanel() {
           <div class="stats-description">completed</div>
         </div>
         <div class="text-center">
-          <button class="btn btn-success px-4 py-2 me-2 fw-semibold" id="complete-all">Mark All</button>
-          <button class="btn btn-danger px-4 py-2 fw-semibold" id="reset-all">Reset</button>
+          <button class="btn btn-success px-4 py-2 me-2 fw-semibold" id="complete-all" title="Use at your own risk. Not officially recommended by Udemy.">Mark All</button>
+          <button class="btn btn-danger px-4 py-2 fw-semibold" id="reset-all" title="Use at your own risk. Not officially recommended by Udemy.">Reset</button>
+          <p class="udemyplus-risk-note">Not officially recommended by Udemy. No known ban reports, but use at your own risk.</p>
         </div>
       </div>
     </div>
   `;
 
-	document.body.appendChild(panel);
+  document.body.appendChild(panel);
 
-	const courseId = getCourseIdFromDOM();
-	if (courseId) {
-		fetchCourseImage(courseId).then(url => {
-			if (url) {
-				const img = panel.querySelector('#course-image');
-				if (img) img.src = url;
-			}
-		});
-	}
+  const courseId = getCourseIdFromDOM();
+  if (courseId) {
+    fetchCourseImage(courseId).then(url => {
+      if (url) {
+        const img = panel.querySelector('#course-image');
+        if (img) img.src = url;
+      }
+    });
+  }
 
-	const btn = document.getElementById('minimize-btn');
-	const body = document.getElementById('panel-body');
-	const completeAllBtn = document.getElementById('complete-all');
-	const resetAllBtn = document.getElementById('reset-all');
+  const btn = document.getElementById('minimize-btn');
+  const body = document.getElementById('panel-body');
+  const completeAllBtn = document.getElementById('complete-all');
+  const resetAllBtn = document.getElementById('reset-all');
 
-	if (btn && body) {
-		btn.addEventListener('click', () => {
-			const isNowMinimized = body.style.display !== 'none';
-			body.style.display = isNowMinimized ? 'none' : 'block';
-			btn.innerHTML = isNowMinimized ? '+' : '&minus;';
-			setMinimizedState(isNowMinimized);
-		});
-	}
+  if (btn && body) {
+    btn.addEventListener('click', () => {
+      const isNowMinimized = body.style.display !== 'none';
+      body.style.display = isNowMinimized ? 'none' : 'block';
+      btn.innerHTML = isNowMinimized ? '+' : '&minus;';
+      setMinimizedState(isNowMinimized);
+    });
+  }
 
-	if (completeAllBtn) {
-		completeAllBtn.addEventListener('click', () => {
-			showConfirmModal({
-				title: 'Confirm Mark All',
-				message: 'Are you sure you want to mark all lessons as completed?',
-				onConfirm: () => markAllLessons?.(true)
-			});
-		});
-	}
+  if (completeAllBtn) {
+    completeAllBtn.addEventListener('click', () => {
+      showConfirmModal({
+        title: 'Confirm Mark All',
+        message: 'Are you sure you want to mark all lessons as completed?',
+        riskNote: RISK_NOTE,
+        onConfirm: () => markAllLessons?.(true)
+      });
+    });
+  }
 
-	if (resetAllBtn) {
-		resetAllBtn.addEventListener('click', () => {
-			showConfirmModal({
-				title: 'Confirm Reset',
-				message: 'Are you sure you want to reset all lessons?',
-				onConfirm: () => markAllLessons?.(false)
-			});
-		});
-	}
+  if (resetAllBtn) {
+    resetAllBtn.addEventListener('click', () => {
+      showConfirmModal({
+        title: 'Confirm Reset',
+        message: 'Are you sure you want to reset all lessons?',
+        riskNote: RISK_NOTE,
+        onConfirm: () => markAllLessons?.(false)
+      });
+    });
+  }
 
-	if (typeof interact !== 'undefined') {
-		interact('#udemy-plus-panel').draggable({
-			allowFrom: '.card-header',
-			listeners: {
-				move(event) {
-					const target = event.target;
-					const dx = event.dx;
-					const dy = event.dy;
+  if (typeof interact !== 'undefined') {
+    interact('#udemy-plus-panel').draggable({
+      allowFrom: '.card-header',
+      listeners: {
+        move(event) {
+          const target = event.target;
+          const dx = event.dx;
+          const dy = event.dy;
 
-					const match = target.style.transform.match(
-						/translate\(([-\d.]+)px,\s*([-\d.]+)px\)/
-					);
-					let x = match ? parseFloat(match[1]) + dx : dx;
-					let y = match ? parseFloat(match[2]) + dy : dy;
+          const match = target.style.transform.match(/translate\(([-\d.]+)px,\s*([-\d.]+)px\)/);
+          let nextX = match ? parseFloat(match[1]) + dx : dx;
+          let nextY = match ? parseFloat(match[2]) + dy : dy;
 
-					const panelRect = target.getBoundingClientRect();
-					const padding = 5;
+          const panelRect = target.getBoundingClientRect();
+          const padding = 5;
 
-					if (x < padding) x = padding;
-					if (x + panelRect.width > window.innerWidth - padding)
-						x = window.innerWidth - panelRect.width - padding;
-					if (y < padding) y = padding;
-					if (y + panelRect.height > window.innerHeight - padding)
-						y = window.innerHeight - panelRect.height - padding;
+          if (nextX < padding) nextX = padding;
+          if (nextX + panelRect.width > window.innerWidth - padding)
+            nextX = window.innerWidth - panelRect.width - padding;
+          if (nextY < padding) nextY = padding;
+          if (nextY + panelRect.height > window.innerHeight - padding)
+            nextY = window.innerHeight - panelRect.height - padding;
 
-					target.style.transform = `translate(${x}px, ${y}px)`;
-					savePanelState({ x, y });
-				}
-			}
-		});
-	}
+          target.style.transform = `translate(${nextX}px, ${nextY}px)`;
+          savePanelState({ x: nextX, y: nextY });
+        }
+      }
+    });
+  }
 
-	const resizeObserver = new ResizeObserver(entries => {
-		for (const entry of entries) {
-			const newWidth = Math.round(entry.contentRect.width);
-			savePanelState({ x, y, width: newWidth });
-			updatePanelStats();
-		}
-	});
+  const resizeObserver = new ResizeObserver(entries => {
+    for (const entry of entries) {
+      const newWidth = Math.round(entry.contentRect.width);
+      const transformMatch = panel.style.transform.match(/translate\(([-\d.]+)px,\s*([-\d.]+)px\)/);
+      const currentX = transformMatch ? parseFloat(transformMatch[1]) : x;
+      const currentY = transformMatch ? parseFloat(transformMatch[2]) : y;
+      savePanelState({ x: currentX, y: currentY, width: newWidth });
+      updatePanelStats();
+    }
+  });
 
-	resizeObserver.observe(panel);
+  resizeObserver.observe(panel);
 }
