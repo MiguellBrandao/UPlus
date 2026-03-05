@@ -12,6 +12,12 @@ export function setupLooping(video) {
   if (!loopIcon || !loopTooltip || loopIcon === boundLoopIcon) return;
   boundLoopIcon = loopIcon;
 
+  const syncLoopUi = () => {
+    const enabled = videoStateService.getLoopEnabled();
+    loopTooltip.textContent = `Loop Video (${enabled ? 'ON' : 'OFF'})`;
+    loopIcon.classList.toggle('text-success', enabled);
+  };
+
   loopIcon.addEventListener('click', () => {
     const newState = !videoStateService.getLoopEnabled();
 
@@ -20,9 +26,10 @@ export function setupLooping(video) {
     }
 
     videoStateService.setLoopEnabled(newState);
-    loopTooltip.textContent = `Loop Video (${newState ? 'ON' : 'OFF'})`;
-    loopIcon.classList.toggle('text-success', newState);
+    syncLoopUi();
   });
+
+  syncLoopUi();
 
   if (loopObserverStarted) return;
   loopObserverStarted = true;

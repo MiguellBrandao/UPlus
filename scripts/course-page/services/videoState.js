@@ -1,5 +1,15 @@
 let loopEnabled = false;
 let autoSkipEnabled = false;
+let preferredPlaybackRate = 1;
+let volumeBoostEnabled = false;
+let focusModeEnabled = false;
+let pipEnabled = false;
+
+function clampPlaybackRate(val) {
+	const num = Number(val);
+	if (!Number.isFinite(num)) return 1;
+	return Math.min(16, Math.max(0.1, Number(num.toFixed(2))));
+}
 
 export const videoStateService = {
 	getLoopEnabled: () => loopEnabled,
@@ -7,6 +17,18 @@ export const videoStateService = {
 
 	getAutoSkipEnabled: () => autoSkipEnabled,
 	setAutoSkipEnabled: (val) => (autoSkipEnabled = val),
+
+	getPreferredPlaybackRate: () => preferredPlaybackRate,
+	setPreferredPlaybackRate: (val) => (preferredPlaybackRate = clampPlaybackRate(val)),
+
+	getVolumeBoostEnabled: () => volumeBoostEnabled,
+	setVolumeBoostEnabled: (val) => (volumeBoostEnabled = Boolean(val)),
+
+	getFocusModeEnabled: () => focusModeEnabled,
+	setFocusModeEnabled: (val) => (focusModeEnabled = Boolean(val)),
+
+	getPipEnabled: () => pipEnabled,
+	setPipEnabled: (val) => (pipEnabled = Boolean(val)),
 
 	disableLoop: () => {
 		loopEnabled = false;

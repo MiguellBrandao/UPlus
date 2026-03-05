@@ -1,3 +1,5 @@
+import { videoStateService } from './services/videoState.js';
+
 function isTypingTarget(target) {
   if (!target) return false;
   const tag = target.tagName?.toLowerCase();
@@ -15,8 +17,9 @@ function adjustVideoSpeed(step) {
   const video = document.querySelector('video');
   if (!video) return false;
 
-  const nextRate = Math.min(16, Math.max(0.1, video.playbackRate + step));
-  video.playbackRate = Number(nextRate.toFixed(2));
+  const nextRate = video.playbackRate + step;
+  videoStateService.setPreferredPlaybackRate(nextRate);
+  video.playbackRate = videoStateService.getPreferredPlaybackRate();
 
   const tooltip = document.querySelector('#udemyplus-speed-wrapper .udemyplus-tooltip');
   if (tooltip) {

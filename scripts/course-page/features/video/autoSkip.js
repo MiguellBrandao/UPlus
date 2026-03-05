@@ -45,6 +45,20 @@ export function setupAutoSkip(video) {
   if (!autoSkipBtn || autoSkipBtn === boundButton) return;
   boundButton = autoSkipBtn;
 
+  const syncUiAndObserver = () => {
+    const enabled = videoStateService.getAutoSkipEnabled();
+    autoSkipBtn.classList.toggle('text-success', enabled);
+    const tooltip = autoSkipBtn.nextElementSibling;
+    if (tooltip) tooltip.textContent = `Auto Skip Delay (${enabled ? 'ON' : 'OFF'})`;
+
+    if (enabled) {
+      ensureSkipObserver();
+      skipObserver.observe(document.body, { childList: true, subtree: true });
+    } else if (skipObserver) {
+      skipObserver.disconnect();
+    }
+  };
+
   autoSkipBtn.addEventListener('click', () => {
     const newState = !videoStateService.getAutoSkipEnabled();
 
@@ -53,15 +67,8 @@ export function setupAutoSkip(video) {
     }
 
     videoStateService.setAutoSkipEnabled(newState);
-    autoSkipBtn.classList.toggle('text-success', newState);
-    const tooltip = autoSkipBtn.nextElementSibling;
-    if (tooltip) tooltip.textContent = `Auto Skip Delay (${newState ? 'ON' : 'OFF'})`;
-
-    if (newState) {
-      ensureSkipObserver();
-      skipObserver.observe(document.body, { childList: true, subtree: true });
-    } else if (skipObserver) {
-      skipObserver.disconnect();
-    }
+    syncUiAndObserver();
   });
+
+  syncUiAndObserver();
 }

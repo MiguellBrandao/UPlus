@@ -1025,65 +1025,31 @@
     nativeControlsBar.appendChild(wrapper);
   }
 
-  // scripts/course-page/features/video/speedControl.js
-  function setupSpeedControl(video) {
-    const speedWrapper = document.getElementById("udemyplus-speed-wrapper");
-    const speedTooltip = speedWrapper.querySelector(".udemyplus-tooltip");
-    speedWrapper.addEventListener("wheel", (e) => {
-      e.preventDefault();
-      const increment = 0.1;
-      const newRate = Math.min(
-        16,
-        Math.max(0.1, video.playbackRate + (e.deltaY < 0 ? increment : -increment))
-      );
-      video.playbackRate = parseFloat(newRate.toFixed(2));
-      speedTooltip.textContent = `Speed (${video.playbackRate.toFixed(2)}x)`;
-    });
-    speedWrapper.addEventListener("click", () => {
-      video.playbackRate = 1;
-      speedTooltip.textContent = `Speed (1.00x)`;
-    });
-  }
-
-  // scripts/course-page/features/video/pipControl.js
-  function setupPipControl(video) {
-    document.getElementById("udemyplus-pip").addEventListener("click", () => {
-      if (document.pictureInPictureElement) document.exitPictureInPicture();
-      else video.requestPictureInPicture().catch(console.error);
-    });
-  }
-
-  // scripts/course-page/features/video/volumeBoost.js
-  function setupVolumeBoost(video) {
-    const volumeIcon = document.getElementById("udemyplus-volume");
-    const volumeTooltip = document.querySelector("#udemyplus-volume-wrapper .udemyplus-tooltip");
-    let boosted = false;
-    let audioContext = null;
-    let gainNode = null;
-    let source = null;
-    volumeIcon.addEventListener("click", () => {
-      if (!audioContext) {
-        audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        source = audioContext.createMediaElementSource(video);
-        gainNode = audioContext.createGain();
-        gainNode.gain.value = 1;
-        source.connect(gainNode).connect(audioContext.destination);
-      }
-      boosted = !boosted;
-      gainNode.gain.value = boosted ? 7 : 1;
-      volumeTooltip.textContent = `Boost Volume (${boosted ? "ON" : "OFF"})`;
-      volumeIcon.classList.toggle("text-success", boosted);
-    });
-  }
-
   // scripts/course-page/services/videoState.js
   var loopEnabled = false;
   var autoSkipEnabled = false;
+  var preferredPlaybackRate = 1;
+  var volumeBoostEnabled = false;
+  var focusModeEnabled = false;
+  var pipEnabled = false;
+  function clampPlaybackRate(val) {
+    const num = Number(val);
+    if (!Number.isFinite(num)) return 1;
+    return Math.min(16, Math.max(0.1, Number(num.toFixed(2))));
+  }
   var videoStateService = {
     getLoopEnabled: () => loopEnabled,
     setLoopEnabled: (val) => loopEnabled = val,
     getAutoSkipEnabled: () => autoSkipEnabled,
     setAutoSkipEnabled: (val) => autoSkipEnabled = val,
+    getPreferredPlaybackRate: () => preferredPlaybackRate,
+    setPreferredPlaybackRate: (val) => preferredPlaybackRate = clampPlaybackRate(val),
+    getVolumeBoostEnabled: () => volumeBoostEnabled,
+    setVolumeBoostEnabled: (val) => volumeBoostEnabled = Boolean(val),
+    getFocusModeEnabled: () => focusModeEnabled,
+    setFocusModeEnabled: (val) => focusModeEnabled = Boolean(val),
+    getPipEnabled: () => pipEnabled,
+    setPipEnabled: (val) => pipEnabled = Boolean(val),
     disableLoop: () => {
       loopEnabled = false;
       const loopIcon = document.getElementById("udemyplus-loop");
@@ -1099,6 +1065,133 @@
       if (skipTooltip) skipTooltip.textContent = "Auto Skip Delay (OFF)";
     }
   };
+
+  // scripts/course-page/features/video/speedControl.js
+  function setupSpeedControl(video) {
+    const speedWrapper = document.getElementById("udemyplus-speed-wrapper");
+    if (!speedWrapper) return;
+    const speedTooltip = speedWrapper.querySelector(".udemyplus-tooltip");
+    const getCurrentVideo = () => document.querySelector("video") || video;
+    const applySpeed = (rate) => {
+      const currentVideo = getCurrentVideo();
+      if (!currentVideo) return;
+      currentVideo.playbackRate = rate;
+      if (speedTooltip) speedTooltip.textContent = `Speed (${currentVideo.playbackRate.toFixed(2)}x)`;
+    };
+    applySpeed(videoStateService.getPreferredPlaybackRate());
+    video.addEventListener("loadedmetadata", () => {
+      applySpeed(videoStateService.getPreferredPlaybackRate());
+    });
+    speedWrapper.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      const currentVideo = getCurrentVideo();
+      if (!currentVideo) return;
+      const increment = 0.1;
+      const nextRate = currentVideo.playbackRate + (e.deltaY < 0 ? increment : -increment);
+      videoStateService.setPreferredPlaybackRate(nextRate);
+      applySpeed(videoStateService.getPreferredPlaybackRate());
+    });
+    speedWrapper.addEventListener("click", () => {
+      videoStateService.setPreferredPlaybackRate(1);
+      applySpeed(videoStateService.getPreferredPlaybackRate());
+    });
+  }
+
+  // scripts/course-page/features/video/pipControl.js
+  function syncPipUi(enabled) {
+    const pipBtn = document.getElementById("udemyplus-pip");
+    const pipTooltip = document.querySelector("#udemyplus-pip-wrapper .udemyplus-tooltip");
+    pipBtn?.classList.toggle("text-success", enabled);
+    if (pipTooltip) pipTooltip.textContent = `Picture in Picture (${enabled ? "ON" : "OFF"})`;
+  }
+  async function applyPipState(video) {
+    const currentVideo = document.querySelector("video") || video;
+    if (!currentVideo) return;
+    const enabled = videoStateService.getPipEnabled();
+    syncPipUi(enabled);
+    if (!document.pictureInPictureEnabled) return;
+    try {
+      if (!enabled && document.pictureInPictureElement) {
+        await document.exitPictureInPicture();
+        return;
+      }
+      if (enabled) {
+        if (document.pictureInPictureElement && document.pictureInPictureElement !== currentVideo) {
+          await document.exitPictureInPicture();
+        }
+        if (document.pictureInPictureElement !== currentVideo) {
+          await currentVideo.requestPictureInPicture();
+        }
+      }
+    } catch {
+    }
+  }
+  function setupPipControl(video) {
+    const pipBtn = document.getElementById("udemyplus-pip");
+    if (!pipBtn) return;
+    void applyPipState(video);
+    if (video.dataset.uplusPipBound !== "true") {
+      video.dataset.uplusPipBound = "true";
+      video.addEventListener("enterpictureinpicture", () => {
+        videoStateService.setPipEnabled(true);
+        syncPipUi(true);
+      });
+      video.addEventListener("leavepictureinpicture", () => {
+        videoStateService.setPipEnabled(false);
+        syncPipUi(false);
+      });
+    }
+    pipBtn.onclick = async () => {
+      const next = !videoStateService.getPipEnabled();
+      videoStateService.setPipEnabled(next);
+      await applyPipState(video);
+      syncPipUi(videoStateService.getPipEnabled());
+    };
+  }
+
+  // scripts/course-page/features/video/volumeBoost.js
+  var audioContext = null;
+  var gainByVideo = /* @__PURE__ */ new WeakMap();
+  function ensureGainNode(video) {
+    if (!audioContext) {
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (gainByVideo.has(video)) return gainByVideo.get(video);
+    const source = audioContext.createMediaElementSource(video);
+    const gainNode = audioContext.createGain();
+    source.connect(gainNode).connect(audioContext.destination);
+    gainByVideo.set(video, gainNode);
+    return gainNode;
+  }
+  function syncVolumeUi(enabled) {
+    const volumeIcon = document.getElementById("udemyplus-volume");
+    const volumeTooltip = document.querySelector("#udemyplus-volume-wrapper .udemyplus-tooltip");
+    if (volumeTooltip) volumeTooltip.textContent = `Boost Volume (${enabled ? "ON" : "OFF"})`;
+    volumeIcon?.classList.toggle("text-success", enabled);
+  }
+  function applyBoostState(video) {
+    const currentVideo = document.querySelector("video") || video;
+    if (!currentVideo) return;
+    const enabled = videoStateService.getVolumeBoostEnabled();
+    syncVolumeUi(enabled);
+    if (!enabled && !gainByVideo.has(currentVideo)) return;
+    try {
+      const gainNode = ensureGainNode(currentVideo);
+      gainNode.gain.value = enabled ? 7 : 1;
+    } catch (error) {
+      console.warn("Could not apply volume boost state:", error);
+    }
+  }
+  function setupVolumeBoost(video) {
+    const volumeIcon = document.getElementById("udemyplus-volume");
+    if (!volumeIcon) return;
+    applyBoostState(video);
+    volumeIcon.addEventListener("click", () => {
+      const next = !videoStateService.getVolumeBoostEnabled();
+      videoStateService.setVolumeBoostEnabled(next);
+      applyBoostState(video);
+    });
+  }
 
   // scripts/course-page/features/video/autoSkip.js
   var skipObserver = null;
@@ -1131,22 +1224,27 @@
     const autoSkipBtn = document.getElementById("udemyplus-disable-next");
     if (!autoSkipBtn || autoSkipBtn === boundButton) return;
     boundButton = autoSkipBtn;
+    const syncUiAndObserver = () => {
+      const enabled = videoStateService.getAutoSkipEnabled();
+      autoSkipBtn.classList.toggle("text-success", enabled);
+      const tooltip = autoSkipBtn.nextElementSibling;
+      if (tooltip) tooltip.textContent = `Auto Skip Delay (${enabled ? "ON" : "OFF"})`;
+      if (enabled) {
+        ensureSkipObserver();
+        skipObserver.observe(document.body, { childList: true, subtree: true });
+      } else if (skipObserver) {
+        skipObserver.disconnect();
+      }
+    };
     autoSkipBtn.addEventListener("click", () => {
       const newState = !videoStateService.getAutoSkipEnabled();
       if (newState && videoStateService.getLoopEnabled()) {
         videoStateService.disableLoop();
       }
       videoStateService.setAutoSkipEnabled(newState);
-      autoSkipBtn.classList.toggle("text-success", newState);
-      const tooltip = autoSkipBtn.nextElementSibling;
-      if (tooltip) tooltip.textContent = `Auto Skip Delay (${newState ? "ON" : "OFF"})`;
-      if (newState) {
-        ensureSkipObserver();
-        skipObserver.observe(document.body, { childList: true, subtree: true });
-      } else if (skipObserver) {
-        skipObserver.disconnect();
-      }
+      syncUiAndObserver();
     });
+    syncUiAndObserver();
   }
 
   // scripts/course-page/features/video/looping.js
@@ -1158,15 +1256,20 @@
     const loopTooltip = document.querySelector("#udemyplus-loop-wrapper .udemyplus-tooltip");
     if (!loopIcon || !loopTooltip || loopIcon === boundLoopIcon) return;
     boundLoopIcon = loopIcon;
+    const syncLoopUi = () => {
+      const enabled = videoStateService.getLoopEnabled();
+      loopTooltip.textContent = `Loop Video (${enabled ? "ON" : "OFF"})`;
+      loopIcon.classList.toggle("text-success", enabled);
+    };
     loopIcon.addEventListener("click", () => {
       const newState = !videoStateService.getLoopEnabled();
       if (newState && videoStateService.getAutoSkipEnabled()) {
         videoStateService.disableAutoSkip();
       }
       videoStateService.setLoopEnabled(newState);
-      loopTooltip.textContent = `Loop Video (${newState ? "ON" : "OFF"})`;
-      loopIcon.classList.toggle("text-success", newState);
+      syncLoopUi();
     });
+    syncLoopUi();
     if (loopObserverStarted) return;
     loopObserverStarted = true;
     const loopObserver = new MutationObserver(() => {
@@ -1189,44 +1292,63 @@
   }
 
   // scripts/course-page/features/video/focusMode.js
-  function setupFocusMode(video) {
-    let focusActive = false;
-    let overlay = null;
+  function getOverlay() {
+    return document.querySelector(".udemyplus-focus-overlay");
+  }
+  function syncFocusUi(enabled) {
     const focusIcon = document.getElementById("udemyplus-focus");
     const focusTooltip = document.querySelector("#udemyplus-focus-wrapper .udemyplus-tooltip");
-    focusIcon.addEventListener("click", () => {
-      const videoParent = video?.parentElement?.parentElement?.parentElement;
-      const panel = document.getElementById("udemy-plus-panel");
-      const videoControlsInner = document.querySelector("#udemyplus-video-controls");
-      const markAllBtn = document.getElementById("complete-all");
-      const resetAllBtn = document.getElementById("reset-all");
-      if (!focusActive) {
+    if (focusTooltip) focusTooltip.textContent = `Focus Mode (${enabled ? "ON" : "OFF"})`;
+    focusIcon?.classList.toggle("text-success", enabled);
+  }
+  function applyFocusState(video, enabled) {
+    const currentVideo = document.querySelector("video") || video;
+    const videoParent = currentVideo?.parentElement?.parentElement?.parentElement;
+    const panel = document.getElementById("udemy-plus-panel");
+    const videoControls = document.querySelector("#udemyplus-video-controls");
+    const markAllBtn = document.getElementById("complete-all");
+    const resetAllBtn = document.getElementById("reset-all");
+    let overlay = getOverlay();
+    if (enabled) {
+      if (!overlay) {
         overlay = document.createElement("div");
         overlay.className = "udemyplus-focus-overlay";
         document.body.appendChild(overlay);
         requestAnimationFrame(() => overlay.style.opacity = "1");
-        if (videoParent) videoParent.classList.add("udemyplus-focus-clear");
-        if (panel) panel.classList.add("udemyplus-fade-out");
-        if (videoControlsInner) videoControlsInner.classList.add("udemyplus-fade-out");
-        if (markAllBtn) markAllBtn.style.display = "none";
-        if (resetAllBtn) resetAllBtn.style.display = "none";
-        focusTooltip.textContent = `Focus Mode (ON)`;
-        focusIcon.classList.add("text-success");
-        focusActive = true;
       } else {
-        if (overlay) {
-          overlay.style.opacity = "0";
-          setTimeout(() => overlay.remove(), 400);
-        }
-        if (videoParent) videoParent.classList.remove("udemyplus-focus-clear");
-        if (panel) panel.classList.remove("udemyplus-fade-out");
-        if (videoControlsInner) videoControlsInner.classList.remove("udemyplus-fade-out");
-        if (markAllBtn) markAllBtn.style.display = "";
-        if (resetAllBtn) resetAllBtn.style.display = "";
-        focusTooltip.textContent = `Focus Mode (OFF)`;
-        focusIcon.classList.remove("text-success");
-        focusActive = false;
+        overlay.style.opacity = "1";
       }
+      if (videoParent) videoParent.classList.add("udemyplus-focus-clear");
+      if (panel) panel.classList.add("udemyplus-fade-out");
+      if (videoControls) videoControls.classList.add("udemyplus-fade-out");
+      if (markAllBtn) markAllBtn.style.display = "none";
+      if (resetAllBtn) resetAllBtn.style.display = "none";
+    } else {
+      if (overlay) {
+        overlay.style.opacity = "0";
+        setTimeout(() => {
+          const currentOverlay = getOverlay();
+          if (currentOverlay) currentOverlay.remove();
+        }, 400);
+      }
+      if (videoParent) videoParent.classList.remove("udemyplus-focus-clear");
+      if (panel) panel.classList.remove("udemyplus-fade-out");
+      if (videoControls) videoControls.classList.remove("udemyplus-fade-out");
+      if (markAllBtn) markAllBtn.style.display = "";
+      if (resetAllBtn) resetAllBtn.style.display = "";
+    }
+    syncFocusUi(enabled);
+  }
+  function setupFocusMode(video) {
+    const focusIcon = document.getElementById("udemyplus-focus");
+    if (!focusIcon) return;
+    applyFocusState(video, videoStateService.getFocusModeEnabled());
+    if (focusIcon.dataset.uplusBound === "true") return;
+    focusIcon.dataset.uplusBound = "true";
+    focusIcon.addEventListener("click", () => {
+      const next = !videoStateService.getFocusModeEnabled();
+      videoStateService.setFocusModeEnabled(next);
+      applyFocusState(video, next);
     });
   }
 
@@ -1362,8 +1484,9 @@
   function adjustVideoSpeed(step) {
     const video = document.querySelector("video");
     if (!video) return false;
-    const nextRate = Math.min(16, Math.max(0.1, video.playbackRate + step));
-    video.playbackRate = Number(nextRate.toFixed(2));
+    const nextRate = video.playbackRate + step;
+    videoStateService.setPreferredPlaybackRate(nextRate);
+    video.playbackRate = videoStateService.getPreferredPlaybackRate();
     const tooltip = document.querySelector("#udemyplus-speed-wrapper .udemyplus-tooltip");
     if (tooltip) {
       tooltip.textContent = `Speed (${video.playbackRate.toFixed(2)}x)`;
