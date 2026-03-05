@@ -8,19 +8,28 @@ import { setupAutoSkip } from '../features/video/autoSkip.js';
 import { setupLooping } from '../features/video/looping.js';
 import { setupFocusMode } from '../features/video/focusMode.js';
 
+function getDirectChild(container, node) {
+  let current = node;
+  while (current && current.parentElement !== container) {
+    current = current.parentElement;
+  }
+  return current;
+}
+
 export function initVideoControls({ forceRecreate = false } = {}) {
-  const bodyContainer = document.querySelector('.app--row--E-WFM.app--body-container--RJZF2');
-  const parent = bodyContainer?.parentElement;
+  const nativeControlsBar = document.querySelector('[data-purpose="video-controls"]');
   const controls = document.querySelector('#udemyplus-video-controls');
 
-  if (!bodyContainer || !parent) return;
+  if (!nativeControlsBar) return;
   if (controls && forceRecreate) {
     controls.remove();
   } else if (controls) {
     return;
   }
 
-  createControlsUI(parent, bodyContainer);
+  const volumeBtn = nativeControlsBar.querySelector('[data-purpose="volume-control-button"]');
+  const volumeBlock = getDirectChild(nativeControlsBar, volumeBtn);
+  createControlsUI(nativeControlsBar, { beforeNode: volumeBlock });
 
   waitForVideoElement(video => {
     setupSpeedControl(video);

@@ -29,6 +29,15 @@ let currentSettings = getSettingsSync();
 let unsubscribeSettings = null;
 let currentConfirmPrefs = { ...DEFAULT_CONFIRM_PREFS };
 
+function getRuntimeAssetUrl(path) {
+  try {
+    if (!chrome?.runtime?.id) return '';
+    return chrome.runtime.getURL(path);
+  } catch {
+    return '';
+  }
+}
+
 function startStatsRefreshLock() {
   const current = Number(window.__uplusStatsRefreshDepth || 0);
   window.__uplusStatsRefreshDepth = current + 1;
@@ -177,6 +186,10 @@ export function insertStatsPanel() {
 
   const { x, y, width, minimized } = getPanelState();
   const courseTitle = getCourseTitle();
+  const brandIconUrl = getRuntimeAssetUrl('assets/icon-32.png');
+  const brandIconHtml = brandIconUrl
+    ? `<img src="${brandIconUrl}" alt="UdemyPlus" class="uplus-brand-icon" />`
+    : '';
 
   const panel = document.createElement('div');
   panel.id = 'udemy-plus-panel';
@@ -189,7 +202,7 @@ export function insertStatsPanel() {
   panel.innerHTML = `
     <div class="card shadow-lg border-0 uplus-theme-default" style="font-family: 'Poppins', sans-serif;">
       <div class="card-header udemyplus-panel-header d-flex justify-content-between align-items-center bg-dark text-white p-4">
-        <span class="uplus-brand-label"><img src="${chrome.runtime.getURL('assets/icon-32.png')}" alt="UdemyPlus" class="uplus-brand-icon" />UdemyPlus</span>
+        <span class="uplus-brand-label">${brandIconHtml}UdemyPlus</span>
         <div class="d-flex align-items-center" style="gap: 8px;">
           <button id="refresh-stats-btn" class="btn p-0 m-0 border-0 bg-transparent text-white" title="Refresh stats now" style="font-size: 1.2rem;">
             <i class="fa-solid fa-rotate-right"></i>

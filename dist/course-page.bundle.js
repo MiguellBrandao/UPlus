@@ -531,6 +531,14 @@
   var currentSettings = getSettingsSync();
   var unsubscribeSettings = null;
   var currentConfirmPrefs = { ...DEFAULT_CONFIRM_PREFS };
+  function getRuntimeAssetUrl(path) {
+    try {
+      if (!chrome?.runtime?.id) return "";
+      return chrome.runtime.getURL(path);
+    } catch {
+      return "";
+    }
+  }
   function startStatsRefreshLock() {
     const current = Number(window.__uplusStatsRefreshDepth || 0);
     window.__uplusStatsRefreshDepth = current + 1;
@@ -654,6 +662,8 @@
     if (document.querySelector("#udemy-plus-panel")) return;
     const { x, y, width, minimized } = getPanelState();
     const courseTitle = getCourseTitle();
+    const brandIconUrl = getRuntimeAssetUrl("assets/icon-32.png");
+    const brandIconHtml = brandIconUrl ? `<img src="${brandIconUrl}" alt="UdemyPlus" class="uplus-brand-icon" />` : "";
     const panel = document.createElement("div");
     panel.id = "udemy-plus-panel";
     panel.className = "udemyplus-stats-panel";
@@ -664,7 +674,7 @@
     panel.innerHTML = `
     <div class="card shadow-lg border-0 uplus-theme-default" style="font-family: 'Poppins', sans-serif;">
       <div class="card-header udemyplus-panel-header d-flex justify-content-between align-items-center bg-dark text-white p-4">
-        <span class="uplus-brand-label"><img src="${chrome.runtime.getURL("assets/icon-32.png")}" alt="UdemyPlus" class="uplus-brand-icon" />UdemyPlus</span>
+        <span class="uplus-brand-label">${brandIconHtml}UdemyPlus</span>
         <div class="d-flex align-items-center" style="gap: 8px;">
           <button id="refresh-stats-btn" class="btn p-0 m-0 border-0 bg-transparent text-white" title="Refresh stats now" style="font-size: 1.2rem;">
             <i class="fa-solid fa-rotate-right"></i>
@@ -931,40 +941,88 @@
   }
 
   // scripts/course-page/features/video/createControlsUI.js
-  function createControlsUI(parent, bodyContainer) {
+  function createControlsUI(nativeControlsBar, { beforeNode = null, afterNode = null } = {}) {
+    if (!nativeControlsBar) return;
     const wrapper = document.createElement("div");
     wrapper.id = "udemyplus-video-controls";
-    wrapper.className = "udemyplus-video-controls d-flex justify-content-start py-2";
-    const inner = document.createElement("div");
-    inner.className = "udemyplus-video-controls-inner d-flex align-items-center gap-4 px-3";
-    inner.innerHTML = `
-    <div class="udemyplus-icon" id="udemyplus-speed-wrapper">
-      <i class="fas fa-tachometer-alt cursor-pointer" id="udemyplus-speed"></i>
+    wrapper.className = "udemyplus-video-controls";
+    wrapper.innerHTML = `
+    <div class="udemyplus-icon popper-module--popper--mM5Ie" id="udemyplus-speed-wrapper">
+      <button
+        type="button"
+        id="udemyplus-speed"
+        class="ud-btn ud-btn-small ud-btn-ghost ud-btn-text-sm control-bar-dropdown--trigger--FnmP- control-bar-dropdown--trigger-dark--ZK26r control-bar-dropdown--trigger-small--ogRJ4"
+        aria-label="UdemyPlus speed control"
+      >
+        <i class="fas fa-gauge-high"></i>
+      </button>
       <div class="udemyplus-tooltip">Speed (1.00x)</div>
     </div>
-    <div class="udemyplus-icon" id="udemyplus-pip-wrapper">
-      <i class="fas fa-clone cursor-pointer" id="udemyplus-pip"></i>
+    <div class="udemyplus-icon popper-module--popper--mM5Ie" id="udemyplus-pip-wrapper">
+      <button
+        type="button"
+        id="udemyplus-pip"
+        class="ud-btn ud-btn-small ud-btn-ghost ud-btn-text-sm control-bar-dropdown--trigger--FnmP- control-bar-dropdown--trigger-dark--ZK26r control-bar-dropdown--trigger-small--ogRJ4"
+        aria-label="UdemyPlus picture in picture"
+      >
+        <i class="fas fa-clone"></i>
+      </button>
       <div class="udemyplus-tooltip">Picture in Picture</div>
     </div>
-    <div class="udemyplus-icon" id="udemyplus-volume-wrapper">
-      <i class="fas fa-bullhorn cursor-pointer" id="udemyplus-volume"></i>
+    <div class="udemyplus-icon popper-module--popper--mM5Ie" id="udemyplus-volume-wrapper">
+      <button
+        type="button"
+        id="udemyplus-volume"
+        class="ud-btn ud-btn-small ud-btn-ghost ud-btn-text-sm control-bar-dropdown--trigger--FnmP- control-bar-dropdown--trigger-dark--ZK26r control-bar-dropdown--trigger-small--ogRJ4"
+        aria-label="UdemyPlus volume boost"
+      >
+        <i class="fas fa-bullhorn"></i>
+      </button>
       <div class="udemyplus-tooltip">Boost Volume (OFF)</div>
     </div>
-    <div class="udemyplus-icon" id="udemyplus-disable-next-wrapper">
-      <i class="fas fa-step-forward cursor-pointer" id="udemyplus-disable-next"></i>
+    <div class="udemyplus-icon popper-module--popper--mM5Ie" id="udemyplus-disable-next-wrapper">
+      <button
+        type="button"
+        id="udemyplus-disable-next"
+        class="ud-btn ud-btn-small ud-btn-ghost ud-btn-text-sm control-bar-dropdown--trigger--FnmP- control-bar-dropdown--trigger-dark--ZK26r control-bar-dropdown--trigger-small--ogRJ4"
+        aria-label="UdemyPlus auto skip delay"
+      >
+        <i class="fas fa-step-forward"></i>
+      </button>
       <div class="udemyplus-tooltip">Auto Skip Delay (OFF)</div>
     </div>
-    <div class="udemyplus-icon" id="udemyplus-focus-wrapper">
-      <i class="fas fa-eye cursor-pointer" id="udemyplus-focus"></i>
+    <div class="udemyplus-icon popper-module--popper--mM5Ie" id="udemyplus-focus-wrapper">
+      <button
+        type="button"
+        id="udemyplus-focus"
+        class="ud-btn ud-btn-small ud-btn-ghost ud-btn-text-sm control-bar-dropdown--trigger--FnmP- control-bar-dropdown--trigger-dark--ZK26r control-bar-dropdown--trigger-small--ogRJ4"
+        aria-label="UdemyPlus focus mode"
+      >
+        <i class="fas fa-eye"></i>
+      </button>
       <div class="udemyplus-tooltip">Focus Mode (OFF)</div>
     </div>
-    <div class="udemyplus-icon" id="udemyplus-loop-wrapper">
-      <i class="fas fa-redo cursor-pointer" id="udemyplus-loop"></i>
+    <div class="udemyplus-icon popper-module--popper--mM5Ie" id="udemyplus-loop-wrapper">
+      <button
+        type="button"
+        id="udemyplus-loop"
+        class="ud-btn ud-btn-small ud-btn-ghost ud-btn-text-sm control-bar-dropdown--trigger--FnmP- control-bar-dropdown--trigger-dark--ZK26r control-bar-dropdown--trigger-small--ogRJ4"
+        aria-label="UdemyPlus loop mode"
+      >
+        <i class="fas fa-rotate-right"></i>
+      </button>
       <div class="udemyplus-tooltip">Loop Video (OFF)</div>
     </div>
   `;
-    wrapper.appendChild(inner);
-    parent.insertBefore(wrapper, bodyContainer.nextSibling);
+    if (beforeNode && beforeNode.parentElement === nativeControlsBar) {
+      nativeControlsBar.insertBefore(wrapper, beforeNode);
+      return;
+    }
+    if (afterNode && afterNode.parentElement === nativeControlsBar) {
+      nativeControlsBar.insertBefore(wrapper, afterNode.nextSibling);
+      return;
+    }
+    nativeControlsBar.appendChild(wrapper);
   }
 
   // scripts/course-page/features/video/speedControl.js
@@ -1139,7 +1197,7 @@
     focusIcon.addEventListener("click", () => {
       const videoParent = video?.parentElement?.parentElement?.parentElement;
       const panel = document.getElementById("udemy-plus-panel");
-      const videoControlsInner = document.querySelector("#udemyplus-video-controls > div");
+      const videoControlsInner = document.querySelector("#udemyplus-video-controls");
       const markAllBtn = document.getElementById("complete-all");
       const resetAllBtn = document.getElementById("reset-all");
       if (!focusActive) {
@@ -1173,17 +1231,25 @@
   }
 
   // scripts/course-page/ui/injectControlsUI.js
+  function getDirectChild(container, node) {
+    let current = node;
+    while (current && current.parentElement !== container) {
+      current = current.parentElement;
+    }
+    return current;
+  }
   function initVideoControls({ forceRecreate = false } = {}) {
-    const bodyContainer = document.querySelector(".app--row--E-WFM.app--body-container--RJZF2");
-    const parent = bodyContainer?.parentElement;
+    const nativeControlsBar = document.querySelector('[data-purpose="video-controls"]');
     const controls = document.querySelector("#udemyplus-video-controls");
-    if (!bodyContainer || !parent) return;
+    if (!nativeControlsBar) return;
     if (controls && forceRecreate) {
       controls.remove();
     } else if (controls) {
       return;
     }
-    createControlsUI(parent, bodyContainer);
+    const volumeBtn = nativeControlsBar.querySelector('[data-purpose="volume-control-button"]');
+    const volumeBlock = getDirectChild(nativeControlsBar, volumeBtn);
+    createControlsUI(nativeControlsBar, { beforeNode: volumeBlock });
     waitForVideoElement((video) => {
       setupSpeedControl(video);
       setupPipControl(video);

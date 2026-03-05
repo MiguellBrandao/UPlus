@@ -7,7 +7,7 @@ export function setupFocusMode(video) {
 	focusIcon.addEventListener('click', () => {
 		const videoParent = video?.parentElement?.parentElement?.parentElement;
 		const panel = document.getElementById('udemy-plus-panel');
-		const videoControlsInner = document.querySelector('#udemyplus-video-controls > div');
+		const videoControlsInner = document.querySelector('#udemyplus-video-controls');
 		const markAllBtn = document.getElementById('complete-all');
 		const resetAllBtn = document.getElementById('reset-all');
 

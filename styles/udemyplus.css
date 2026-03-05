@@ -96,24 +96,23 @@
 /* Video Controls */
 
 .udemyplus-video-controls {
-  z-index: 9000;
-  position: relative;
-  padding: 0 2.5rem;
-}
-
-.udemyplus-video-controls-inner {
-  background: radial-gradient(circle at top left, #ffffff 0%, #e2e2e2 100%);
-  border-radius: 20px;
-  font-size: 1.9rem;
-  color: #333;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  padding-top: 0.7rem;
-  padding-bottom: 0.7rem;
-  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 6px;
+  margin-right: 10px;
 }
 
 .udemyplus-icon {
   position: relative;
+}
+
+.udemyplus-icon .ud-btn i {
+  font-size: 1.45rem;
+}
+
+.udemyplus-icon .ud-btn.text-success i {
+  color: #31d475;
 }
 
 .udemyplus-tooltip {
