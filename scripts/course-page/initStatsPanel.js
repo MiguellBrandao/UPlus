@@ -1,5 +1,5 @@
 import { insertStatsPanel } from './ui/panel.js';
-import { monitorCheckboxChanges, watchCurrentLessonChange } from './observers/statObservers.js';
+import { monitorCheckboxChanges } from './observers/statObservers.js';
 import { saveCurrentCourseToHistory } from './services/courseHistory.js';
 
 export function initStatsPanel() {
@@ -14,7 +14,6 @@ export function initStatsPanel() {
       saveCurrentCourseToHistory();
       insertStatsPanel();
       monitorCheckboxChanges();
-      watchCurrentLessonChange();
     }
 
     if (++tries > 60) clearInterval(interval);

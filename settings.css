@@ -60,6 +60,12 @@ body {
   font-size: 1.05rem;
 }
 
+.settings-two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
 .row {
   display: flex;
   justify-content: space-between;
@@ -76,6 +82,23 @@ body {
   margin-top: 14px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   padding-top: 12px;
+}
+
+.confirm-actions-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+
+.confirm-actions-card h3 {
+  margin: 0 0 4px;
+  font-size: 1rem;
+}
+
+.confirm-actions-card p {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 0.82rem;
 }
 
 .confirm-actions h3 {
@@ -182,4 +205,10 @@ body {
 
 .toast-item.success {
   border-color: #6e4ec4;
+}
+
+@media (max-width: 860px) {
+  .settings-two-col {
+    grid-template-columns: 1fr;
+  }
 }

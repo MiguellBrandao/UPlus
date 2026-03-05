@@ -91,9 +91,69 @@
     });
   }
 
+  // scripts/course-page/services/settingsStore.js
+  var SETTINGS_KEY = "uplus_settings";
+  var DEFAULT_SETTINGS = {
+    showCourseImage: true,
+    autoRefreshStats: true,
+    showPercentCompleted: true,
+    showRemainingTime: true,
+    showStatsMeta: false,
+    statsCacheTtlHours: 1
+  };
+  var settingsCache = { ...DEFAULT_SETTINGS };
+  var initialized = false;
+  var storageListenerBound = false;
+  var subscribers = /* @__PURE__ */ new Set();
+  function notifySubscribers() {
+    subscribers.forEach((handler) => {
+      try {
+        handler({ ...settingsCache });
+      } catch (error) {
+        console.warn("Settings subscriber failed:", error);
+      }
+    });
+  }
+  async function initSettingsStore() {
+    if (initialized) return { ...settingsCache };
+    try {
+      const result = await chrome.storage.local.get(SETTINGS_KEY);
+      settingsCache = { ...DEFAULT_SETTINGS, ...result[SETTINGS_KEY] || {} };
+    } catch (error) {
+      console.warn("Failed to load settings from storage:", error);
+      settingsCache = { ...DEFAULT_SETTINGS };
+    }
+    if (!storageListenerBound) {
+      chrome.storage.onChanged.addListener((changes) => {
+        const entry = changes[SETTINGS_KEY];
+        if (!entry) return;
+        settingsCache = { ...DEFAULT_SETTINGS, ...entry.newValue || {} };
+        notifySubscribers();
+      });
+      storageListenerBound = true;
+    }
+    initialized = true;
+    return { ...settingsCache };
+  }
+  function getSettingsSync() {
+    return { ...settingsCache };
+  }
+  async function getSettings() {
+    if (!initialized) {
+      await initSettingsStore();
+    }
+    return { ...settingsCache };
+  }
+  function subscribeToSettings(handler) {
+    subscribers.add(handler);
+    return () => subscribers.delete(handler);
+  }
+
   // scripts/course-page/services/statsService.js
-  var STATS_CACHE_TTL_MS = 24 * 60 * 60 * 1e3;
   var CACHE_PREFIX = "udemyPlusCourseStats::";
+  var DEFAULT_CACHE_TTL_HOURS = 1;
+  var MIN_CACHE_TTL_HOURS = 1;
+  var MAX_CACHE_TTL_HOURS = 24;
   function parseDurationToMinutes(text) {
     if (!text) return null;
     const normalized = text.toLowerCase().replace(/\s+/g, " ").trim();
@@ -173,14 +233,60 @@
     } catch {
     }
   }
-  function isCacheFresh(timestamp) {
+  function getCacheTtlHoursValue() {
+    const settings = getSettingsSync();
+    const raw = Number(settings.statsCacheTtlHours);
+    if (!Number.isFinite(raw)) return DEFAULT_CACHE_TTL_HOURS;
+    return Math.min(MAX_CACHE_TTL_HOURS, Math.max(MIN_CACHE_TTL_HOURS, raw));
+  }
+  function getCacheTtlMs() {
+    return getCacheTtlHoursValue() * 60 * 60 * 1e3;
+  }
+  function isCacheFresh(timestamp, ttlMs) {
     if (!timestamp) return false;
-    return Date.now() - timestamp < STATS_CACHE_TTL_MS;
+    return Date.now() - timestamp < ttlMs;
+  }
+  function clamp(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+  }
+  function updateStatsFromLessonToggle(checkboxEl) {
+    if (!checkboxEl) return null;
+    const lessonItem = checkboxEl.closest("li.curriculum-item-link--curriculum-item--OVP5S");
+    if (!lessonItem) return null;
+    const minutes = getLessonMinutes(lessonItem);
+    if (minutes === null) return null;
+    const cached = getCachedStats();
+    if (!cached) return null;
+    const becameCompleted = Boolean(checkboxEl.checked);
+    const completedDelta = becameCompleted ? 1 : -1;
+    const minutesDelta = becameCompleted ? minutes : -minutes;
+    const completedLessons = clamp(
+      (cached.completedLessons || 0) + completedDelta,
+      0,
+      cached.totalLessons || 0
+    );
+    const completedMinutes = clamp(
+      (cached.completedMinutes || 0) + minutesDelta,
+      0,
+      cached.totalMinutes || 0
+    );
+    const progressPercent = (cached.totalLessons || 0) > 0 ? Math.round(completedLessons / cached.totalLessons * 100) : 0;
+    const next = {
+      ...cached,
+      completedLessons,
+      completedMinutes,
+      progressPercent,
+      timestamp: Date.now(),
+      source: "incremental"
+    };
+    setCachedStats(next);
+    return { ...next, fromCache: false };
   }
   async function getCourseStats({ forceRefresh = false, expandBeforeScrape = true } = {}) {
     const cached = getCachedStats();
-    if (!forceRefresh && cached && isCacheFresh(cached.timestamp)) {
-      return { ...cached, fromCache: true };
+    const ttlMs = getCacheTtlMs();
+    if (!forceRefresh && cached && isCacheFresh(cached.timestamp, ttlMs)) {
+      return { ...cached, source: "cache", fromCache: true };
     }
     let sectionState = [];
     if (expandBeforeScrape) {
@@ -197,7 +303,8 @@
     }
     const payload = {
       ...liveStats,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      source: "live scrape"
     };
     setCachedStats(payload);
     return { ...payload, fromCache: false };
@@ -207,7 +314,7 @@
     return titleEl ? titleEl.textContent.trim() : "Course Title";
   }
   function getCacheTtlHours() {
-    return STATS_CACHE_TTL_MS / (60 * 60 * 1e3);
+    return getCacheTtlHoursValue();
   }
 
   // scripts/course-page/services/udemyApi.js
@@ -393,6 +500,7 @@
   }
   async function markAllLessons(completed) {
     showLoadingOverlay();
+    window.__uplusBulkActionRunning = true;
     let sectionState = [];
     try {
       sectionState = await expandAllSectionsWithState();
@@ -402,71 +510,14 @@
       });
       await sleep2(700);
       await updatePanelStats({ forceRefresh: true, expandBeforeScrape: false });
-      await restoreSectionState(sectionState);
-      focusTopPreviouslyOpenSection(sectionState);
-      hideLoadingOverlay();
     } catch (error) {
       console.warn("Failed to mark all lessons:", error);
+    } finally {
       await restoreSectionState(sectionState);
       focusTopPreviouslyOpenSection(sectionState);
       hideLoadingOverlay();
+      window.__uplusBulkActionRunning = false;
     }
-  }
-
-  // scripts/course-page/services/settingsStore.js
-  var SETTINGS_KEY = "uplus_settings";
-  var DEFAULT_SETTINGS = {
-    showCourseImage: true,
-    autoRefreshStats: true,
-    showPercentCompleted: true,
-    showRemainingTime: true
-  };
-  var settingsCache = { ...DEFAULT_SETTINGS };
-  var initialized = false;
-  var storageListenerBound = false;
-  var subscribers = /* @__PURE__ */ new Set();
-  function notifySubscribers() {
-    subscribers.forEach((handler) => {
-      try {
-        handler({ ...settingsCache });
-      } catch (error) {
-        console.warn("Settings subscriber failed:", error);
-      }
-    });
-  }
-  async function initSettingsStore() {
-    if (initialized) return { ...settingsCache };
-    try {
-      const result = await chrome.storage.local.get(SETTINGS_KEY);
-      settingsCache = { ...DEFAULT_SETTINGS, ...result[SETTINGS_KEY] || {} };
-    } catch (error) {
-      console.warn("Failed to load settings from storage:", error);
-      settingsCache = { ...DEFAULT_SETTINGS };
-    }
-    if (!storageListenerBound) {
-      chrome.storage.onChanged.addListener((changes) => {
-        const entry = changes[SETTINGS_KEY];
-        if (!entry) return;
-        settingsCache = { ...DEFAULT_SETTINGS, ...entry.newValue || {} };
-        notifySubscribers();
-      });
-      storageListenerBound = true;
-    }
-    initialized = true;
-    return { ...settingsCache };
-  }
-  function getSettingsSync() {
-    return { ...settingsCache };
-  }
-  async function getSettings() {
-    if (!initialized) {
-      await initSettingsStore();
-    }
-    return { ...settingsCache };
-  }
-  function subscribeToSettings(handler) {
-    subscribers.add(handler);
-    return () => subscribers.delete(handler);
   }
 
   // scripts/course-page/ui/panel.js
@@ -511,6 +562,10 @@
     if (remainingBlock) {
       remainingBlock.style.display = settings.showRemainingTime ? "block" : "none";
     }
+    const cacheMeta = panel.querySelector("#stats-cache-meta");
+    if (cacheMeta) {
+      cacheMeta.style.display = settings.showStatsMeta ? "block" : "none";
+    }
   }
   function applyStatsToPanel(panel, stats) {
     const lessonsEl = panel.querySelector(".stats-lessons");
@@ -529,9 +584,10 @@
     }
     if (percentEl) percentEl.innerText = `${stats.progressPercent}%`;
     if (cacheMetaEl) {
-      const source = stats.fromCache ? "cache" : "live scrape";
+      const source = stats.source || (stats.fromCache ? "cache" : "live scrape");
+      const sourceLabel = source === "incremental" ? "instant update" : source;
       const updated = new Date(stats.timestamp).toLocaleString("en-US");
-      cacheMetaEl.innerText = `Source: ${source} | Updated: ${updated} | TTL: ${getCacheTtlHours()}h`;
+      cacheMetaEl.innerText = `Source: ${sourceLabel} | Updated: ${updated} | TTL: ${getCacheTtlHours()}h`;
     }
   }
   async function updatePanelStats({ forceRefresh = false, expandBeforeScrape = true } = {}) {
@@ -547,6 +603,16 @@
     } finally {
       if (refreshBtn) refreshBtn.disabled = false;
     }
+  }
+  function updatePanelStatsFromToggle(checkboxEl) {
+    const panel = document.querySelector("#udemy-plus-panel");
+    if (!panel) return;
+    const deltaStats = updateStatsFromLessonToggle(checkboxEl);
+    if (deltaStats) {
+      applyStatsToPanel(panel, deltaStats);
+      return;
+    }
+    void updatePanelStats({ forceRefresh: true, expandBeforeScrape: true });
   }
   function runBulkAction(completed) {
     const actionKey = completed ? "markAll" : "reset";
@@ -724,20 +790,11 @@
   function monitorCheckboxChanges() {
     document.body.addEventListener("change", (e) => {
       if (e.target && e.target.matches('input[type="checkbox"][data-purpose="progress-toggle-button"]')) {
+        if (window.__uplusBulkActionRunning) return;
         if (!getSettingsSync().autoRefreshStats) return;
-        updatePanelStats({ forceRefresh: true, expandBeforeScrape: false });
+        updatePanelStatsFromToggle(e.target);
       }
     });
-  }
-  function watchCurrentLessonChange() {
-    let lastUrl = location.href;
-    setInterval(() => {
-      if (location.href !== lastUrl) {
-        lastUrl = location.href;
-        if (!getSettingsSync().autoRefreshStats) return;
-        updatePanelStats({ forceRefresh: true, expandBeforeScrape: false });
-      }
-    }, 1e3);
   }
 
   // scripts/course-page/services/courseHistory.js
@@ -785,7 +842,6 @@
         saveCurrentCourseToHistory();
         insertStatsPanel();
         monitorCheckboxChanges();
-        watchCurrentLessonChange();
       }
       if (++tries > 60) clearInterval(interval);
     }, 500);

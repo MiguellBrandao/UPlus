@@ -3,9 +3,12 @@ import {
   restoreSectionState,
   focusTopPreviouslyOpenSection
 } from '../utils/domHelpers.js';
+import { getSettingsSync } from './settingsStore.js';
 
-const STATS_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const CACHE_PREFIX = 'udemyPlusCourseStats::';
+const DEFAULT_CACHE_TTL_HOURS = 1;
+const MIN_CACHE_TTL_HOURS = 1;
+const MAX_CACHE_TTL_HOURS = 24;
 
 function parseDurationToMinutes(text) {
   if (!text) return null;
@@ -106,16 +109,74 @@ function setCachedStats(payload) {
   }
 }
 
-function isCacheFresh(timestamp) {
+function getCacheTtlHoursValue() {
+  const settings = getSettingsSync();
+  const raw = Number(settings.statsCacheTtlHours);
+  if (!Number.isFinite(raw)) return DEFAULT_CACHE_TTL_HOURS;
+  return Math.min(MAX_CACHE_TTL_HOURS, Math.max(MIN_CACHE_TTL_HOURS, raw));
+}
+
+function getCacheTtlMs() {
+  return getCacheTtlHoursValue() * 60 * 60 * 1000;
+}
+
+function isCacheFresh(timestamp, ttlMs) {
   if (!timestamp) return false;
-  return Date.now() - timestamp < STATS_CACHE_TTL_MS;
+  return Date.now() - timestamp < ttlMs;
+}
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+export function updateStatsFromLessonToggle(checkboxEl) {
+  if (!checkboxEl) return null;
+
+  const lessonItem = checkboxEl.closest('li.curriculum-item-link--curriculum-item--OVP5S');
+  if (!lessonItem) return null;
+
+  const minutes = getLessonMinutes(lessonItem);
+  if (minutes === null) return null;
+
+  const cached = getCachedStats();
+  if (!cached) return null;
+
+  const becameCompleted = Boolean(checkboxEl.checked);
+  const completedDelta = becameCompleted ? 1 : -1;
+  const minutesDelta = becameCompleted ? minutes : -minutes;
+
+  const completedLessons = clamp(
+    (cached.completedLessons || 0) + completedDelta,
+    0,
+    cached.totalLessons || 0
+  );
+  const completedMinutes = clamp(
+    (cached.completedMinutes || 0) + minutesDelta,
+    0,
+    cached.totalMinutes || 0
+  );
+  const progressPercent =
+    (cached.totalLessons || 0) > 0 ? Math.round((completedLessons / cached.totalLessons) * 100) : 0;
+
+  const next = {
+    ...cached,
+    completedLessons,
+    completedMinutes,
+    progressPercent,
+    timestamp: Date.now(),
+    source: 'incremental'
+  };
+
+  setCachedStats(next);
+  return { ...next, fromCache: false };
 }
 
 export async function getCourseStats({ forceRefresh = false, expandBeforeScrape = true } = {}) {
   const cached = getCachedStats();
+  const ttlMs = getCacheTtlMs();
 
-  if (!forceRefresh && cached && isCacheFresh(cached.timestamp)) {
-    return { ...cached, fromCache: true };
+  if (!forceRefresh && cached && isCacheFresh(cached.timestamp, ttlMs)) {
+    return { ...cached, source: 'cache', fromCache: true };
   }
 
   let sectionState = [];
@@ -134,7 +195,8 @@ export async function getCourseStats({ forceRefresh = false, expandBeforeScrape 
   }
   const payload = {
     ...liveStats,
-    timestamp: Date.now()
+    timestamp: Date.now(),
+    source: 'live scrape'
   };
 
   setCachedStats(payload);
@@ -150,5 +212,5 @@ export function getCourseTitle() {
 }
 
 export function getCacheTtlHours() {
-  return STATS_CACHE_TTL_MS / (60 * 60 * 1000);
+  return getCacheTtlHoursValue();
 }

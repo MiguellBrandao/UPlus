@@ -4,7 +4,9 @@ export const DEFAULT_SETTINGS = {
   showCourseImage: true,
   autoRefreshStats: true,
   showPercentCompleted: true,
-  showRemainingTime: true
+  showRemainingTime: true,
+  showStatsMeta: false,
+  statsCacheTtlHours: 1
 };
 
 let settingsCache = { ...DEFAULT_SETTINGS };

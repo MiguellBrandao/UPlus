@@ -1,4 +1,9 @@
-import { getCourseStats, getCourseTitle, getCacheTtlHours } from '../services/statsService.js';
+import {
+  getCourseStats,
+  getCourseTitle,
+  getCacheTtlHours,
+  updateStatsFromLessonToggle
+} from '../services/statsService.js';
 import { getCourseIdFromDOM, fetchCourseImage } from '../services/udemyApi.js';
 import { formatDuration } from '../utils/formatters.js';
 import { showConfirmModal } from './confirmModal.js';
@@ -60,6 +65,11 @@ function applyPanelSettings(panel, settings) {
   if (remainingBlock) {
     remainingBlock.style.display = settings.showRemainingTime ? 'block' : 'none';
   }
+
+  const cacheMeta = panel.querySelector('#stats-cache-meta');
+  if (cacheMeta) {
+    cacheMeta.style.display = settings.showStatsMeta ? 'block' : 'none';
+  }
 }
 
 function applyStatsToPanel(panel, stats) {
@@ -82,9 +92,10 @@ function applyStatsToPanel(panel, stats) {
   if (percentEl) percentEl.innerText = `${stats.progressPercent}%`;
 
   if (cacheMetaEl) {
-    const source = stats.fromCache ? 'cache' : 'live scrape';
+    const source = stats.source || (stats.fromCache ? 'cache' : 'live scrape');
+    const sourceLabel = source === 'incremental' ? 'instant update' : source;
     const updated = new Date(stats.timestamp).toLocaleString('en-US');
-    cacheMetaEl.innerText = `Source: ${source} | Updated: ${updated} | TTL: ${getCacheTtlHours()}h`;
+    cacheMetaEl.innerText = `Source: ${sourceLabel} | Updated: ${updated} | TTL: ${getCacheTtlHours()}h`;
   }
 }
 
@@ -103,6 +114,19 @@ export async function updatePanelStats({ forceRefresh = false, expandBeforeScrap
   } finally {
     if (refreshBtn) refreshBtn.disabled = false;
   }
+}
+
+export function updatePanelStatsFromToggle(checkboxEl) {
+  const panel = document.querySelector('#udemy-plus-panel');
+  if (!panel) return;
+
+  const deltaStats = updateStatsFromLessonToggle(checkboxEl);
+  if (deltaStats) {
+    applyStatsToPanel(panel, deltaStats);
+    return;
+  }
+
+  void updatePanelStats({ forceRefresh: true, expandBeforeScrape: true });
 }
 
 function runBulkAction(completed) {

@@ -16,6 +16,7 @@ function sleep(ms) {
 
 export async function markAllLessons(completed) {
   showLoadingOverlay();
+  window.__uplusBulkActionRunning = true;
 
   let sectionState = [];
   try {
@@ -29,13 +30,12 @@ export async function markAllLessons(completed) {
     // Let Udemy update its own UI state after bulk click.
     await sleep(700);
     await updatePanelStats({ forceRefresh: true, expandBeforeScrape: false });
-    await restoreSectionState(sectionState);
-    focusTopPreviouslyOpenSection(sectionState);
-    hideLoadingOverlay();
   } catch (error) {
     console.warn('Failed to mark all lessons:', error);
+  } finally {
     await restoreSectionState(sectionState);
     focusTopPreviouslyOpenSection(sectionState);
     hideLoadingOverlay();
+    window.__uplusBulkActionRunning = false;
   }
 }

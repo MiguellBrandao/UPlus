@@ -31,18 +31,34 @@
         <span>Show remaining time in panel</span>
         <input id="setting-show-remaining" type="checkbox" />
       </label>
+      <label class="row toggle-row">
+        <span>Show stats source/updated info in panel</span>
+        <input id="setting-show-meta" type="checkbox" />
+      </label>
     </section>
 
-    <section class="card">
-      <h2>Behavior</h2>
-      <label class="row select-row">
-        <span>Stats refresh mode</span>
-        <select id="setting-refresh-mode" class="pretty-select">
-          <option value="auto">Auto refresh on progress changes</option>
-          <option value="manual">Manual refresh only</option>
-        </select>
-      </label>
-      <div class="confirm-actions">
+    <section class="settings-two-col">
+      <div class="card">
+        <h2>Behavior</h2>
+        <label class="row select-row">
+          <span>Stats refresh mode</span>
+          <select id="setting-refresh-mode" class="pretty-select">
+            <option value="auto">Auto refresh on progress changes</option>
+            <option value="manual">Manual refresh only</option>
+          </select>
+        </label>
+        <label class="row select-row">
+          <span>Stats cache TTL</span>
+          <select id="setting-cache-ttl" class="pretty-select">
+            <option value="1">1 hour</option>
+            <option value="3">3 hours</option>
+            <option value="6">6 hours</option>
+            <option value="12">12 hours</option>
+            <option value="24">24 hours</option>
+          </select>
+        </label>
+      </div>
+      <div class="card confirm-actions-card">
         <h3>Per-action confirmation state</h3>
         <p>Choose whether each confirmation is active or ignored.</p>
         <label class="row select-row">

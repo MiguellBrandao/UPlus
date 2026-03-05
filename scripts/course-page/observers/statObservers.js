@@ -1,4 +1,4 @@
-import { updatePanelStats } from '../ui/panel.js';
+import { updatePanelStatsFromToggle } from '../ui/panel.js';
 import { getSettingsSync } from '../services/settingsStore.js';
 
 export function monitorCheckboxChanges() {
@@ -7,20 +7,9 @@ export function monitorCheckboxChanges() {
       e.target &&
       e.target.matches('input[type="checkbox"][data-purpose="progress-toggle-button"]')
     ) {
+      if (window.__uplusBulkActionRunning) return;
       if (!getSettingsSync().autoRefreshStats) return;
-      updatePanelStats({ forceRefresh: true, expandBeforeScrape: false });
+      updatePanelStatsFromToggle(e.target);
     }
   });
-}
-
-export function watchCurrentLessonChange() {
-  let lastUrl = location.href;
-
-  setInterval(() => {
-    if (location.href !== lastUrl) {
-      lastUrl = location.href;
-      if (!getSettingsSync().autoRefreshStats) return;
-      updatePanelStats({ forceRefresh: true, expandBeforeScrape: false });
-    }
-  }, 1000);
 }

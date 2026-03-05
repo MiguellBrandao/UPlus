@@ -10,14 +10,18 @@ const DEFAULT_SETTINGS = {
   showCourseImage: true,
   autoRefreshStats: true,
   showPercentCompleted: true,
-  showRemainingTime: true
+  showRemainingTime: true,
+  showStatsMeta: false,
+  statsCacheTtlHours: 1
 };
 
 const fields = {
   showCourseImage: document.getElementById('setting-show-image'),
   showPercentCompleted: document.getElementById('setting-show-percent'),
   showRemainingTime: document.getElementById('setting-show-remaining'),
+  showStatsMeta: document.getElementById('setting-show-meta'),
   refreshMode: document.getElementById('setting-refresh-mode'),
+  cacheTtlHours: document.getElementById('setting-cache-ttl'),
   confirmMarkAll: document.getElementById('confirm-markall'),
   confirmReset: document.getElementById('confirm-reset'),
   confirmRefresh: document.getElementById('confirm-refresh')
@@ -48,7 +52,9 @@ function fillForm(settings) {
   fields.showCourseImage.checked = Boolean(settings.showCourseImage);
   fields.showPercentCompleted.checked = Boolean(settings.showPercentCompleted);
   fields.showRemainingTime.checked = Boolean(settings.showRemainingTime);
+  fields.showStatsMeta.checked = Boolean(settings.showStatsMeta);
   fields.refreshMode.value = settings.autoRefreshStats ? 'auto' : 'manual';
+  fields.cacheTtlHours.value = String(settings.statsCacheTtlHours || 1);
 }
 
 function fillConfirmPrefs(confirmPrefs) {
@@ -62,7 +68,9 @@ function readForm() {
     showCourseImage: fields.showCourseImage.checked,
     showPercentCompleted: fields.showPercentCompleted.checked,
     showRemainingTime: fields.showRemainingTime.checked,
-    autoRefreshStats: fields.refreshMode.value === 'auto'
+    showStatsMeta: fields.showStatsMeta.checked,
+    autoRefreshStats: fields.refreshMode.value === 'auto',
+    statsCacheTtlHours: Number(fields.cacheTtlHours.value) || 1
   };
 }
 

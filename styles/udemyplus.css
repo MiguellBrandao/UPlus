@@ -154,8 +154,9 @@
 .udemyplus-cache-meta {
   margin-top: 10px;
   margin-bottom: 0;
-  font-size: 0.72rem;
-  color: #666;
+  display: block;
+  font-size: 0.68rem;
+  color: #7a7a7a;
   text-align: center;
 }
 
