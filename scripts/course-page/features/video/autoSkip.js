@@ -1,47 +1,67 @@
 import { videoStateService } from '../../services/videoState.js';
 
+let skipObserver = null;
+let boundButton = null;
+
+function findNextLessonButton() {
+  const currentItem =
+    document.querySelector('li.curriculum-item-link--is-current--2mKk4') ||
+    document.querySelector('li[aria-current="true"]');
+  if (!currentItem) return null;
+
+  let next = currentItem.nextElementSibling;
+  while (next) {
+    const clickable =
+      next.querySelector('a[href*="/learn/lecture/"]') ||
+      next.querySelector('button[data-purpose="lecture-item-link"]') ||
+      next.querySelector('button');
+    if (clickable) return clickable;
+    next = next.nextElementSibling;
+  }
+
+  return null;
+}
+
+function ensureSkipObserver() {
+  if (skipObserver) return;
+
+  skipObserver = new MutationObserver(() => {
+    const popup = document.querySelector('.interstitial--container--4wumM');
+    if (!popup || !videoStateService.getAutoSkipEnabled()) return;
+
+    popup.style.display = 'none';
+
+    const nextLesson = findNextLessonButton();
+    if (nextLesson) {
+      nextLesson.click();
+    }
+  });
+}
+
 export function setupAutoSkip(video) {
-	const autoSkipBtn = document.getElementById('udemyplus-disable-next');
-	let skipObserver = null;
+  void video;
 
-	autoSkipBtn.addEventListener('click', () => {
-		const newState = !videoStateService.getAutoSkipEnabled();
+  const autoSkipBtn = document.getElementById('udemyplus-disable-next');
+  if (!autoSkipBtn || autoSkipBtn === boundButton) return;
+  boundButton = autoSkipBtn;
 
-		if (newState && videoStateService.getLoopEnabled()) {
-			videoStateService.disableLoop();
-		}
+  autoSkipBtn.addEventListener('click', () => {
+    const newState = !videoStateService.getAutoSkipEnabled();
 
-		videoStateService.setAutoSkipEnabled(newState);
-		autoSkipBtn.classList.toggle('text-success', newState);
-		const tooltip = autoSkipBtn.nextElementSibling;
-		if (tooltip) tooltip.textContent = `Auto Skip Delay (${newState ? 'ON' : 'OFF'})`;
+    if (newState && videoStateService.getLoopEnabled()) {
+      videoStateService.disableLoop();
+    }
 
-		if (newState) {
-			if (skipObserver) skipObserver.disconnect();
+    videoStateService.setAutoSkipEnabled(newState);
+    autoSkipBtn.classList.toggle('text-success', newState);
+    const tooltip = autoSkipBtn.nextElementSibling;
+    if (tooltip) tooltip.textContent = `Auto Skip Delay (${newState ? 'ON' : 'OFF'})`;
 
-			skipObserver = new MutationObserver(() => {
-				const popup = document.querySelector('.interstitial--container--4wumM');
-				if (popup && videoStateService.getAutoSkipEnabled()) {
-					popup.style.display = 'none';
-
-					const current = document.querySelector('li.curriculum-item-link--is-current--2mKk4');
-					if (!current) return;
-
-					let next = current.nextElementSibling;
-					while (next && !next.matches('li[aria-current="false"]')) {
-						next = next.nextElementSibling;
-					}
-
-					if (next) {
-						const playBtn = next.querySelector('button[aria-label^="Reproduzir"]');
-						if (playBtn) playBtn.click();
-					}
-				}
-			});
-
-			skipObserver.observe(document.body, { childList: true, subtree: true });
-		} else if (skipObserver) {
-			skipObserver.disconnect();
-		}
-	});
+    if (newState) {
+      ensureSkipObserver();
+      skipObserver.observe(document.body, { childList: true, subtree: true });
+    } else if (skipObserver) {
+      skipObserver.disconnect();
+    }
+  });
 }

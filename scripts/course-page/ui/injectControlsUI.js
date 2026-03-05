@@ -8,11 +8,17 @@ import { setupAutoSkip } from '../features/video/autoSkip.js';
 import { setupLooping } from '../features/video/looping.js';
 import { setupFocusMode } from '../features/video/focusMode.js';
 
-export function initVideoControls() {
+export function initVideoControls({ forceRecreate = false } = {}) {
   const bodyContainer = document.querySelector('.app--row--E-WFM.app--body-container--RJZF2');
   const parent = bodyContainer?.parentElement;
+  const controls = document.querySelector('#udemyplus-video-controls');
 
-  if (!bodyContainer || !parent || document.querySelector('#udemyplus-video-controls')) return;
+  if (!bodyContainer || !parent) return;
+  if (controls && forceRecreate) {
+    controls.remove();
+  } else if (controls) {
+    return;
+  }
 
   createControlsUI(parent, bodyContainer);
 

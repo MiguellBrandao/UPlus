@@ -7,6 +7,7 @@ import {
 import { getCourseIdFromDOM, fetchCourseImage } from '../services/udemyApi.js';
 import { formatDuration } from '../utils/formatters.js';
 import { showConfirmModal } from './confirmModal.js';
+import { showLoadingOverlay, hideLoadingOverlay } from './loadingOverlay.js';
 import { savePanelState, getPanelState, setMinimizedState } from '../services/storageService.js';
 import { markAllLessons } from '../services/courseActions.js';
 import {
@@ -84,7 +85,7 @@ function applyStatsToPanel(panel, stats) {
 
   if (lessonsEl) lessonsEl.innerText = `${stats.completedLessons}/${stats.totalLessons}`;
   if (durationEl) {
-    durationEl.innerText = `~ ${formatDuration(stats.completedMinutes, shortFormat)} / ${formatDuration(stats.totalMinutes, shortFormat)}`;
+    durationEl.innerText = `${formatDuration(stats.completedMinutes, shortFormat)} / ${formatDuration(stats.totalMinutes, shortFormat)}`;
   }
   if (remainingEl) {
     remainingEl.innerText = formatDuration(remainingMinutes, false);
@@ -99,12 +100,17 @@ function applyStatsToPanel(panel, stats) {
   }
 }
 
-export async function updatePanelStats({ forceRefresh = false, expandBeforeScrape = true } = {}) {
+export async function updatePanelStats({
+  forceRefresh = false,
+  expandBeforeScrape = true,
+  showLoading = false
+} = {}) {
   const panel = document.querySelector('#udemy-plus-panel');
   if (!panel) return;
 
   const refreshBtn = panel.querySelector('#refresh-stats-btn');
   if (refreshBtn) refreshBtn.disabled = true;
+  if (showLoading) showLoadingOverlay();
 
   try {
     const stats = await getCourseStats({ forceRefresh, expandBeforeScrape });
@@ -112,6 +118,7 @@ export async function updatePanelStats({ forceRefresh = false, expandBeforeScrap
   } catch (error) {
     console.warn('Failed to update panel stats:', error);
   } finally {
+    if (showLoading) hideLoadingOverlay();
     if (refreshBtn) refreshBtn.disabled = false;
   }
 }
@@ -190,7 +197,7 @@ export function insertStatsPanel() {
             <div class="stats-description">lessons completed</div>
           </div>
           <div class="flex-fill text-center rounded p-2">
-            <div class="stats-duration fw-semibold">~ loading...</div>
+            <div class="stats-duration fw-semibold">loading...</div>
             <div class="stats-description">watched / total</div>
           </div>
         </div>
@@ -254,7 +261,7 @@ export function insertStatsPanel() {
   if (refreshBtn) {
     refreshBtn.addEventListener('click', () => {
       if (!currentConfirmPrefs.refresh) {
-        updatePanelStats({ forceRefresh: true, expandBeforeScrape: true });
+        updatePanelStats({ forceRefresh: true, expandBeforeScrape: true, showLoading: true });
         return;
       }
 
@@ -269,7 +276,7 @@ export function insertStatsPanel() {
           if (dontShowAgain) {
             void setConfirmPreference('refresh', false);
           }
-          updatePanelStats({ forceRefresh: true, expandBeforeScrape: true });
+          updatePanelStats({ forceRefresh: true, expandBeforeScrape: true, showLoading: true });
         }
       });
     });

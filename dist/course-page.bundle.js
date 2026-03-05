@@ -454,21 +454,6 @@
     document.body.appendChild(confirmModal);
   }
 
-  // scripts/course-page/services/storageService.js
-  function savePanelState({ x, y, width }) {
-    localStorage.setItem("udemyPlusPanelPos", JSON.stringify({ x, y }));
-    if (width) localStorage.setItem("udemyPlusPanelWidth", width);
-  }
-  function getPanelState() {
-    const pos = JSON.parse(localStorage.getItem("udemyPlusPanelPos")) || { x: 20, y: 20 };
-    const width = parseInt(localStorage.getItem("udemyPlusPanelWidth")) || 275;
-    const minimized = localStorage.getItem("udemyPlusMinimized") === "true";
-    return { ...pos, width, minimized };
-  }
-  function setMinimizedState(isMinimized) {
-    localStorage.setItem("udemyPlusMinimized", isMinimized);
-  }
-
   // scripts/course-page/ui/loadingOverlay.js
   function showLoadingOverlay() {
     const base = document.querySelector(".ct-sidebar-course-content");
@@ -489,6 +474,21 @@
   function hideLoadingOverlay() {
     const overlay = document.getElementById("udemy-plus-loading");
     if (overlay) overlay.remove();
+  }
+
+  // scripts/course-page/services/storageService.js
+  function savePanelState({ x, y, width }) {
+    localStorage.setItem("udemyPlusPanelPos", JSON.stringify({ x, y }));
+    if (width) localStorage.setItem("udemyPlusPanelWidth", width);
+  }
+  function getPanelState() {
+    const pos = JSON.parse(localStorage.getItem("udemyPlusPanelPos")) || { x: 20, y: 20 };
+    const width = parseInt(localStorage.getItem("udemyPlusPanelWidth")) || 275;
+    const minimized = localStorage.getItem("udemyPlusMinimized") === "true";
+    return { ...pos, width, minimized };
+  }
+  function setMinimizedState(isMinimized) {
+    localStorage.setItem("udemyPlusMinimized", isMinimized);
   }
 
   // scripts/course-page/services/courseActions.js
@@ -577,7 +577,7 @@
     const remainingMinutes = Math.max(0, stats.totalMinutes - stats.completedMinutes);
     if (lessonsEl) lessonsEl.innerText = `${stats.completedLessons}/${stats.totalLessons}`;
     if (durationEl) {
-      durationEl.innerText = `~ ${formatDuration(stats.completedMinutes, shortFormat)} / ${formatDuration(stats.totalMinutes, shortFormat)}`;
+      durationEl.innerText = `${formatDuration(stats.completedMinutes, shortFormat)} / ${formatDuration(stats.totalMinutes, shortFormat)}`;
     }
     if (remainingEl) {
       remainingEl.innerText = formatDuration(remainingMinutes, false);
@@ -590,17 +590,23 @@
       cacheMetaEl.innerText = `Source: ${sourceLabel} | Updated: ${updated} | TTL: ${getCacheTtlHours()}h`;
     }
   }
-  async function updatePanelStats({ forceRefresh = false, expandBeforeScrape = true } = {}) {
+  async function updatePanelStats({
+    forceRefresh = false,
+    expandBeforeScrape = true,
+    showLoading = false
+  } = {}) {
     const panel = document.querySelector("#udemy-plus-panel");
     if (!panel) return;
     const refreshBtn = panel.querySelector("#refresh-stats-btn");
     if (refreshBtn) refreshBtn.disabled = true;
+    if (showLoading) showLoadingOverlay();
     try {
       const stats = await getCourseStats({ forceRefresh, expandBeforeScrape });
       applyStatsToPanel(panel, stats);
     } catch (error) {
       console.warn("Failed to update panel stats:", error);
     } finally {
+      if (showLoading) hideLoadingOverlay();
       if (refreshBtn) refreshBtn.disabled = false;
     }
   }
@@ -668,7 +674,7 @@
             <div class="stats-description">lessons completed</div>
           </div>
           <div class="flex-fill text-center rounded p-2">
-            <div class="stats-duration fw-semibold">~ loading...</div>
+            <div class="stats-duration fw-semibold">loading...</div>
             <div class="stats-description">watched / total</div>
           </div>
         </div>
@@ -724,7 +730,7 @@
     if (refreshBtn) {
       refreshBtn.addEventListener("click", () => {
         if (!currentConfirmPrefs.refresh) {
-          updatePanelStats({ forceRefresh: true, expandBeforeScrape: true });
+          updatePanelStats({ forceRefresh: true, expandBeforeScrape: true, showLoading: true });
           return;
         }
         showConfirmModal({
@@ -736,7 +742,7 @@
             if (dontShowAgain) {
               void setConfirmPreference("refresh", false);
             }
-            updatePanelStats({ forceRefresh: true, expandBeforeScrape: true });
+            updatePanelStats({ forceRefresh: true, expandBeforeScrape: true, showLoading: true });
           }
         });
       });
@@ -787,14 +793,75 @@
   }
 
   // scripts/course-page/observers/statObservers.js
+  function getLessonKey(checkbox, index) {
+    const li = checkbox.closest("li");
+    if (!li) return `idx:${index}`;
+    const lectureAnchor = li.querySelector('a[href*="/learn/lecture/"]');
+    const href = lectureAnchor?.getAttribute("href") || "";
+    const match = href.match(/\/learn\/lecture\/(\d+)/);
+    if (match?.[1]) return `lecture:${match[1]}`;
+    return `idx:${index}`;
+  }
+  function getProgressCheckboxes2() {
+    return Array.from(
+      document.querySelectorAll('input[type="checkbox"][data-purpose="progress-toggle-button"]')
+    );
+  }
+  function readCheckboxStateMap() {
+    const map = /* @__PURE__ */ new Map();
+    getProgressCheckboxes2().forEach((checkbox, index) => {
+      map.set(getLessonKey(checkbox, index), Boolean(checkbox.checked));
+    });
+    return map;
+  }
+  function applyStateDiff(previousMap, nextMap) {
+    if (window.__uplusBulkActionRunning) return;
+    if (!getSettingsSync().autoRefreshStats) return;
+    const checkboxes = getProgressCheckboxes2();
+    checkboxes.forEach((checkbox, index) => {
+      const key = getLessonKey(checkbox, index);
+      if (!previousMap.has(key) || !nextMap.has(key)) return;
+      const previousChecked = previousMap.get(key);
+      const nextChecked = nextMap.get(key);
+      if (previousChecked === nextChecked) return;
+      updatePanelStatsFromToggle(checkbox);
+    });
+  }
   function monitorCheckboxChanges() {
+    if (window.__uplusStatsObserverBound) return;
+    window.__uplusStatsObserverBound = true;
+    let lastState = readCheckboxStateMap();
+    let scheduled = false;
+    const scheduleDiff = () => {
+      if (scheduled) return;
+      scheduled = true;
+      window.setTimeout(() => {
+        const nextState = readCheckboxStateMap();
+        applyStateDiff(lastState, nextState);
+        lastState = nextState;
+        scheduled = false;
+      }, 120);
+    };
     document.body.addEventListener("change", (e) => {
       if (e.target && e.target.matches('input[type="checkbox"][data-purpose="progress-toggle-button"]')) {
         if (window.__uplusBulkActionRunning) return;
         if (!getSettingsSync().autoRefreshStats) return;
         updatePanelStatsFromToggle(e.target);
+        lastState = readCheckboxStateMap();
       }
     });
+    const observer = new MutationObserver(() => {
+      scheduleDiff();
+    });
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["checked", "aria-checked", "class"]
+    });
+    window.setInterval(() => {
+      scheduleDiff();
+    }, 800);
   }
 
   // scripts/course-page/services/courseHistory.js
@@ -960,9 +1027,36 @@
   };
 
   // scripts/course-page/features/video/autoSkip.js
+  var skipObserver = null;
+  var boundButton = null;
+  function findNextLessonButton() {
+    const currentItem = document.querySelector("li.curriculum-item-link--is-current--2mKk4") || document.querySelector('li[aria-current="true"]');
+    if (!currentItem) return null;
+    let next = currentItem.nextElementSibling;
+    while (next) {
+      const clickable = next.querySelector('a[href*="/learn/lecture/"]') || next.querySelector('button[data-purpose="lecture-item-link"]') || next.querySelector("button");
+      if (clickable) return clickable;
+      next = next.nextElementSibling;
+    }
+    return null;
+  }
+  function ensureSkipObserver() {
+    if (skipObserver) return;
+    skipObserver = new MutationObserver(() => {
+      const popup = document.querySelector(".interstitial--container--4wumM");
+      if (!popup || !videoStateService.getAutoSkipEnabled()) return;
+      popup.style.display = "none";
+      const nextLesson = findNextLessonButton();
+      if (nextLesson) {
+        nextLesson.click();
+      }
+    });
+  }
   function setupAutoSkip(video) {
+    void video;
     const autoSkipBtn = document.getElementById("udemyplus-disable-next");
-    let skipObserver = null;
+    if (!autoSkipBtn || autoSkipBtn === boundButton) return;
+    boundButton = autoSkipBtn;
     autoSkipBtn.addEventListener("click", () => {
       const newState = !videoStateService.getAutoSkipEnabled();
       if (newState && videoStateService.getLoopEnabled()) {
@@ -973,23 +1067,7 @@
       const tooltip = autoSkipBtn.nextElementSibling;
       if (tooltip) tooltip.textContent = `Auto Skip Delay (${newState ? "ON" : "OFF"})`;
       if (newState) {
-        if (skipObserver) skipObserver.disconnect();
-        skipObserver = new MutationObserver(() => {
-          const popup = document.querySelector(".interstitial--container--4wumM");
-          if (popup && videoStateService.getAutoSkipEnabled()) {
-            popup.style.display = "none";
-            const current = document.querySelector("li.curriculum-item-link--is-current--2mKk4");
-            if (!current) return;
-            let next = current.nextElementSibling;
-            while (next && !next.matches('li[aria-current="false"]')) {
-              next = next.nextElementSibling;
-            }
-            if (next) {
-              const playBtn = next.querySelector('button[aria-label^="Reproduzir"]');
-              if (playBtn) playBtn.click();
-            }
-          }
-        });
+        ensureSkipObserver();
         skipObserver.observe(document.body, { childList: true, subtree: true });
       } else if (skipObserver) {
         skipObserver.disconnect();
@@ -998,9 +1076,14 @@
   }
 
   // scripts/course-page/features/video/looping.js
+  var loopObserverStarted = false;
+  var boundLoopIcon = null;
   function setupLooping(video) {
+    void video;
     const loopIcon = document.getElementById("udemyplus-loop");
     const loopTooltip = document.querySelector("#udemyplus-loop-wrapper .udemyplus-tooltip");
+    if (!loopIcon || !loopTooltip || loopIcon === boundLoopIcon) return;
+    boundLoopIcon = loopIcon;
     loopIcon.addEventListener("click", () => {
       const newState = !videoStateService.getLoopEnabled();
       if (newState && videoStateService.getAutoSkipEnabled()) {
@@ -1010,15 +1093,17 @@
       loopTooltip.textContent = `Loop Video (${newState ? "ON" : "OFF"})`;
       loopIcon.classList.toggle("text-success", newState);
     });
+    if (loopObserverStarted) return;
+    loopObserverStarted = true;
     const loopObserver = new MutationObserver(() => {
       const popup = document.querySelector(".interstitial--container--4wumM");
       if (popup && videoStateService.getLoopEnabled()) {
         const cancelBtn = popup.querySelector('button[data-purpose="cancel-button"]');
         if (cancelBtn) {
           cancelBtn.click();
-          const video2 = document.querySelector("video");
-          if (video2) {
-            video2.currentTime = 0;
+          const currentVideo = document.querySelector("video");
+          if (currentVideo) {
+            currentVideo.currentTime = 0;
             waitForElement('button[data-purpose="play-button"]').then((playBtn) => {
               setTimeout(() => playBtn.click(), 500);
             }).catch((err) => console.warn(err));
@@ -1072,10 +1157,16 @@
   }
 
   // scripts/course-page/ui/injectControlsUI.js
-  function initVideoControls() {
+  function initVideoControls({ forceRecreate = false } = {}) {
     const bodyContainer = document.querySelector(".app--row--E-WFM.app--body-container--RJZF2");
     const parent = bodyContainer?.parentElement;
-    if (!bodyContainer || !parent || document.querySelector("#udemyplus-video-controls")) return;
+    const controls = document.querySelector("#udemyplus-video-controls");
+    if (!bodyContainer || !parent) return;
+    if (controls && forceRecreate) {
+      controls.remove();
+    } else if (controls) {
+      return;
+    }
     createControlsUI(parent, bodyContainer);
     waitForVideoElement((video) => {
       setupSpeedControl(video);
@@ -1088,15 +1179,90 @@
   }
 
   // scripts/course-page/initVideoControls.js
+  function getLessonKey2(checkbox, index) {
+    const li = checkbox.closest("li");
+    if (!li) return `idx:${index}`;
+    const lectureAnchor = li.querySelector('a[href*="/learn/lecture/"]');
+    const href = lectureAnchor?.getAttribute("href") || "";
+    const match = href.match(/\/learn\/lecture\/(\d+)/);
+    if (match?.[1]) return `lecture:${match[1]}`;
+    const dataPurpose = li.getAttribute("data-purpose") || "";
+    if (dataPurpose) return `purpose:${dataPurpose}:${index}`;
+    return `idx:${index}`;
+  }
+  function snapshotCheckboxStates() {
+    const checkboxes = Array.from(
+      document.querySelectorAll('input[type="checkbox"][data-purpose="progress-toggle-button"]')
+    );
+    const map = /* @__PURE__ */ new Map();
+    checkboxes.forEach((checkbox, index) => {
+      map.set(getLessonKey2(checkbox, index), Boolean(checkbox.checked));
+    });
+    return map;
+  }
+  function syncIncrementalStatsFromChanges(previousMap) {
+    if (!previousMap || previousMap.size === 0) return false;
+    const checkboxes = Array.from(
+      document.querySelectorAll('input[type="checkbox"][data-purpose="progress-toggle-button"]')
+    );
+    let hasChanges = false;
+    checkboxes.forEach((checkbox, index) => {
+      const key = getLessonKey2(checkbox, index);
+      if (!previousMap.has(key)) return;
+      const previousChecked = previousMap.get(key);
+      const currentChecked = Boolean(checkbox.checked);
+      if (previousChecked === currentChecked) return;
+      hasChanges = true;
+      updatePanelStatsFromToggle(checkbox);
+    });
+    return hasChanges;
+  }
   function observeVideoContainer() {
+    const getLectureId = () => {
+      const match = location.pathname.match(/\/learn\/lecture\/(\d+)/);
+      return match?.[1] || null;
+    };
+    let lastLectureId = getLectureId();
+    let lastPathname = location.pathname;
+    let lectureChangeTimer = null;
+    let checkboxSnapshot = snapshotCheckboxStates();
+    const handleLectureChange = () => {
+      if (lectureChangeTimer) clearTimeout(lectureChangeTimer);
+      lectureChangeTimer = window.setTimeout(() => {
+        const previousSnapshot = checkboxSnapshot;
+        initVideoControls({ forceRecreate: true });
+        syncIncrementalStatsFromChanges(previousSnapshot);
+        checkboxSnapshot = snapshotCheckboxStates();
+      }, 350);
+    };
     const observer = new MutationObserver(() => {
-      const bodyContainer = document.querySelector(".app--row--E-WFM.app--body-container--RJZF2");
-      if (bodyContainer) {
-        initVideoControls();
-        observer.disconnect();
+      initVideoControls();
+      const currentLectureId = getLectureId();
+      const currentPathname = location.pathname;
+      const routeChanged = currentPathname !== lastPathname;
+      const lectureChanged = routeChanged && currentLectureId && currentLectureId !== lastLectureId;
+      if (lectureChanged) {
+        lastPathname = currentPathname;
+        lastLectureId = currentLectureId;
+        handleLectureChange();
+      } else {
+        lastPathname = currentPathname;
+        lastLectureId = currentLectureId || lastLectureId;
+        checkboxSnapshot = snapshotCheckboxStates();
       }
     });
     observer.observe(document.body, { childList: true, subtree: true });
+    window.setInterval(() => {
+      const currentLectureId = getLectureId();
+      const currentPathname = location.pathname;
+      if (currentPathname === lastPathname) return;
+      const lectureChanged = currentLectureId && currentLectureId !== lastLectureId;
+      lastPathname = currentPathname;
+      lastLectureId = currentLectureId || lastLectureId;
+      if (lectureChanged) {
+        handleLectureChange();
+      }
+    }, 500);
   }
 
   // scripts/course-page/keyboardShortcuts.js
