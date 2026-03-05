@@ -135,6 +135,20 @@
   opacity: 1;
 }
 
+/* Section Status Highlights */
+
+button.uplus-section-complete {
+  color: #2b6a45 !important;
+}
+
+button.uplus-section-progress {
+  color: #7b611a !important;
+}
+
+button.uplus-section-not-started {
+  color: #b23a3a !important;
+}
+
 /* Confirm Modal */
 
 .udemy-plus-confirm-modal {

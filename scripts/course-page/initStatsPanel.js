@@ -1,5 +1,6 @@
 import { insertStatsPanel } from './ui/panel.js';
 import { monitorCheckboxChanges } from './observers/statObservers.js';
+import { initSectionStatusStyling } from './observers/sectionStatusStyling.js';
 import { saveCurrentCourseToHistory } from './services/courseHistory.js';
 
 export function initStatsPanel() {
@@ -14,6 +15,7 @@ export function initStatsPanel() {
       saveCurrentCourseToHistory();
       insertStatsPanel();
       monitorCheckboxChanges();
+      initSectionStatusStyling();
     }
 
     if (++tries > 60) clearInterval(interval);

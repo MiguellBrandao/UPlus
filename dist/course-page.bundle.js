@@ -99,7 +99,9 @@
     showPercentCompleted: true,
     showRemainingTime: true,
     showStatsMeta: false,
-    statsCacheTtlHours: 1
+    statsCacheTtlHours: 1,
+    highlightSectionProgress: true,
+    persistVideoControllerState: true
   };
   var settingsCache = { ...DEFAULT_SETTINGS };
   var initialized = false;
@@ -890,6 +892,84 @@
     }, 800);
   }
 
+  // scripts/course-page/observers/sectionStatusStyling.js
+  var SECTION_BUTTON_SELECTOR = [
+    "button.js-panel-toggler",
+    ".ud-accordion-panel-toggler button",
+    '[class*="accordion-panel-module--outer-panel-toggler--"] button'
+  ].join(", ");
+  var SECTION_CONTAINER_SELECTOR = [
+    '[class*="accordion-panel-module--panel--"]',
+    ".ud-accordion-panel",
+    'li[class*="section--section"]'
+  ].join(", ");
+  function parseSectionProgressFromText(text) {
+    if (!text) return null;
+    const match = text.match(/(\d+)\s*\/\s*(\d+)/);
+    if (!match) return null;
+    const completed = Number(match[1]);
+    const total = Number(match[2]);
+    if (!Number.isFinite(completed) || !Number.isFinite(total) || total <= 0) return null;
+    return { completed, total };
+  }
+  function getSectionProgress(button) {
+    const container = button.closest(SECTION_CONTAINER_SELECTOR) || button.parentElement;
+    if (!container) return null;
+    const statusTextEl = container.querySelector('[data-purpose="section-duration"] span[aria-hidden="true"]') || container.querySelector('[data-purpose="section-duration"]');
+    return parseSectionProgressFromText(statusTextEl?.textContent || "");
+  }
+  function clearSectionStyles(button) {
+    button.classList.remove(
+      "uplus-section-complete",
+      "uplus-section-progress",
+      "uplus-section-not-started"
+    );
+  }
+  function applySectionStyles() {
+    const { highlightSectionProgress } = getSettingsSync();
+    const sectionButtons = Array.from(document.querySelectorAll(SECTION_BUTTON_SELECTOR));
+    sectionButtons.forEach((button) => {
+      clearSectionStyles(button);
+      if (!highlightSectionProgress) return;
+      const progress = getSectionProgress(button);
+      if (!progress) return;
+      if (progress.completed === 0) {
+        button.classList.add("uplus-section-not-started");
+        return;
+      }
+      if (progress.completed >= progress.total && progress.completed > 0) {
+        button.classList.add("uplus-section-complete");
+        return;
+      }
+      if (progress.completed > 0 && progress.completed < progress.total) {
+        button.classList.add("uplus-section-progress");
+      }
+    });
+  }
+  function initSectionStatusStyling() {
+    if (window.__uplusSectionStylingBound) return;
+    window.__uplusSectionStylingBound = true;
+    let scheduled = false;
+    const scheduleApply = () => {
+      if (scheduled) return;
+      scheduled = true;
+      window.setTimeout(() => {
+        applySectionStyles();
+        scheduled = false;
+      }, 150);
+    };
+    applySectionStyles();
+    subscribeToSettings(() => applySectionStyles());
+    const observer = new MutationObserver(() => {
+      scheduleApply();
+    });
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      characterData: true
+    });
+  }
+
   // scripts/course-page/services/courseHistory.js
   var HISTORY_KEY = "uplus_course_history";
   var MAX_ITEMS = 20;
@@ -935,6 +1015,7 @@
         saveCurrentCourseToHistory();
         insertStatsPanel();
         monitorCheckboxChanges();
+        initSectionStatusStyling();
       }
       if (++tries > 60) clearInterval(interval);
     }, 500);
@@ -1032,26 +1113,99 @@
   var volumeBoostEnabled = false;
   var focusModeEnabled = false;
   var pipEnabled = false;
+  var persistAcrossReloads = true;
+  var VIDEO_STATE_STORAGE_KEY = "uplus_video_control_state_v1";
   function clampPlaybackRate(val) {
     const num = Number(val);
     if (!Number.isFinite(num)) return 1;
     return Math.min(16, Math.max(0.1, Number(num.toFixed(2))));
   }
+  function getStateSnapshot() {
+    return {
+      loopEnabled,
+      autoSkipEnabled,
+      preferredPlaybackRate: clampPlaybackRate(preferredPlaybackRate),
+      volumeBoostEnabled,
+      focusModeEnabled,
+      pipEnabled
+    };
+  }
+  function applyStateSnapshot(snapshot = {}) {
+    loopEnabled = Boolean(snapshot.loopEnabled);
+    autoSkipEnabled = Boolean(snapshot.autoSkipEnabled);
+    preferredPlaybackRate = clampPlaybackRate(snapshot.preferredPlaybackRate);
+    volumeBoostEnabled = Boolean(snapshot.volumeBoostEnabled);
+    focusModeEnabled = Boolean(snapshot.focusModeEnabled);
+    pipEnabled = Boolean(snapshot.pipEnabled);
+  }
+  function persistStateIfEnabled() {
+    if (!persistAcrossReloads) return;
+    try {
+      localStorage.setItem(VIDEO_STATE_STORAGE_KEY, JSON.stringify(getStateSnapshot()));
+    } catch {
+    }
+  }
+  function loadPersistedStateIfEnabled() {
+    if (!persistAcrossReloads) return;
+    try {
+      const raw = localStorage.getItem(VIDEO_STATE_STORAGE_KEY);
+      if (!raw) return;
+      applyStateSnapshot(JSON.parse(raw));
+    } catch {
+    }
+  }
+  function initVideoStatePersistence() {
+    const settings = getSettingsSync();
+    persistAcrossReloads = settings.persistVideoControllerState !== false;
+    loadPersistedStateIfEnabled();
+    subscribeToSettings((nextSettings) => {
+      const nextPersist = nextSettings.persistVideoControllerState !== false;
+      if (nextPersist === persistAcrossReloads) return;
+      persistAcrossReloads = nextPersist;
+      if (persistAcrossReloads) {
+        persistStateIfEnabled();
+        return;
+      }
+      try {
+        localStorage.removeItem(VIDEO_STATE_STORAGE_KEY);
+      } catch {
+      }
+    });
+  }
   var videoStateService = {
     getLoopEnabled: () => loopEnabled,
-    setLoopEnabled: (val) => loopEnabled = val,
+    setLoopEnabled: (val) => {
+      loopEnabled = Boolean(val);
+      persistStateIfEnabled();
+    },
     getAutoSkipEnabled: () => autoSkipEnabled,
-    setAutoSkipEnabled: (val) => autoSkipEnabled = val,
+    setAutoSkipEnabled: (val) => {
+      autoSkipEnabled = Boolean(val);
+      persistStateIfEnabled();
+    },
     getPreferredPlaybackRate: () => preferredPlaybackRate,
-    setPreferredPlaybackRate: (val) => preferredPlaybackRate = clampPlaybackRate(val),
+    setPreferredPlaybackRate: (val) => {
+      preferredPlaybackRate = clampPlaybackRate(val);
+      persistStateIfEnabled();
+    },
     getVolumeBoostEnabled: () => volumeBoostEnabled,
-    setVolumeBoostEnabled: (val) => volumeBoostEnabled = Boolean(val),
+    setVolumeBoostEnabled: (val) => {
+      volumeBoostEnabled = Boolean(val);
+      persistStateIfEnabled();
+    },
     getFocusModeEnabled: () => focusModeEnabled,
-    setFocusModeEnabled: (val) => focusModeEnabled = Boolean(val),
+    setFocusModeEnabled: (val) => {
+      focusModeEnabled = Boolean(val);
+      persistStateIfEnabled();
+    },
     getPipEnabled: () => pipEnabled,
-    setPipEnabled: (val) => pipEnabled = Boolean(val),
+    setPipEnabled: (val) => {
+      pipEnabled = Boolean(val);
+      persistStateIfEnabled();
+    },
     disableLoop: () => {
       loopEnabled = false;
+      persistStateIfEnabled();
       const loopIcon = document.getElementById("udemyplus-loop");
       const loopTooltip = document.querySelector("#udemyplus-loop-wrapper .udemyplus-tooltip");
       loopIcon?.classList.remove("text-success");
@@ -1059,6 +1213,7 @@
     },
     disableAutoSkip: () => {
       autoSkipEnabled = false;
+      persistStateIfEnabled();
       const skipBtn = document.getElementById("udemyplus-disable-next");
       const skipTooltip = skipBtn?.nextElementSibling;
       skipBtn?.classList.remove("text-success");
@@ -1527,6 +1682,7 @@
   document.head.appendChild(faCSS);
   async function boot() {
     await initSettingsStore();
+    initVideoStatePersistence();
     initStatsPanel();
     observeVideoContainer();
     initKeyboardShortcuts();

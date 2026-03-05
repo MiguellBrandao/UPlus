@@ -12,7 +12,9 @@ const DEFAULT_SETTINGS = {
   showPercentCompleted: true,
   showRemainingTime: true,
   showStatsMeta: false,
-  statsCacheTtlHours: 1
+  statsCacheTtlHours: 1,
+  highlightSectionProgress: true,
+  persistVideoControllerState: true
 };
 
 const fields = {
@@ -20,6 +22,8 @@ const fields = {
   showPercentCompleted: document.getElementById('setting-show-percent'),
   showRemainingTime: document.getElementById('setting-show-remaining'),
   showStatsMeta: document.getElementById('setting-show-meta'),
+  sectionHighlights: document.getElementById('setting-section-highlights'),
+  persistControllers: document.getElementById('setting-persist-controllers'),
   refreshMode: document.getElementById('setting-refresh-mode'),
   cacheTtlHours: document.getElementById('setting-cache-ttl'),
   confirmMarkAll: document.getElementById('confirm-markall'),
@@ -53,6 +57,8 @@ function fillForm(settings) {
   fields.showPercentCompleted.checked = Boolean(settings.showPercentCompleted);
   fields.showRemainingTime.checked = Boolean(settings.showRemainingTime);
   fields.showStatsMeta.checked = Boolean(settings.showStatsMeta);
+  fields.sectionHighlights.checked = Boolean(settings.highlightSectionProgress);
+  fields.persistControllers.checked = Boolean(settings.persistVideoControllerState);
   fields.refreshMode.value = settings.autoRefreshStats ? 'auto' : 'manual';
   fields.cacheTtlHours.value = String(settings.statsCacheTtlHours || 1);
 }
@@ -69,6 +75,8 @@ function readForm() {
     showPercentCompleted: fields.showPercentCompleted.checked,
     showRemainingTime: fields.showRemainingTime.checked,
     showStatsMeta: fields.showStatsMeta.checked,
+    highlightSectionProgress: fields.sectionHighlights.checked,
+    persistVideoControllerState: fields.persistControllers.checked,
     autoRefreshStats: fields.refreshMode.value === 'auto',
     statsCacheTtlHours: Number(fields.cacheTtlHours.value) || 1
   };

@@ -6,7 +6,9 @@ export const DEFAULT_SETTINGS = {
   showPercentCompleted: true,
   showRemainingTime: true,
   showStatsMeta: false,
-  statsCacheTtlHours: 1
+  statsCacheTtlHours: 1,
+  highlightSectionProgress: true,
+  persistVideoControllerState: true
 };
 
 let settingsCache = { ...DEFAULT_SETTINGS };
