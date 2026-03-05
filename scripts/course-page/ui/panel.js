@@ -118,9 +118,10 @@ export async function updatePanelStats({
   const panel = document.querySelector('#udemy-plus-panel');
   if (!panel) return;
 
+  const shouldShowLoading = showLoading || expandBeforeScrape;
   const refreshBtn = panel.querySelector('#refresh-stats-btn');
   if (refreshBtn) refreshBtn.disabled = true;
-  if (showLoading) showLoadingOverlay();
+  if (shouldShowLoading) showLoadingOverlay();
   startStatsRefreshLock();
 
   try {
@@ -130,7 +131,7 @@ export async function updatePanelStats({
     console.warn('Failed to update panel stats:', error);
   } finally {
     endStatsRefreshLock();
-    if (showLoading) hideLoadingOverlay();
+    if (shouldShowLoading) hideLoadingOverlay();
     if (refreshBtn) refreshBtn.disabled = false;
   }
 }
