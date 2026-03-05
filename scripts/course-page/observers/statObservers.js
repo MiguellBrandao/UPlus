@@ -27,8 +27,13 @@ function readCheckboxStateMap() {
   return map;
 }
 
+function isStatsRefreshRunning() {
+  return Number(window.__uplusStatsRefreshDepth || 0) > 0;
+}
+
 function applyStateDiff(previousMap, nextMap) {
   if (window.__uplusBulkActionRunning) return;
+  if (isStatsRefreshRunning()) return;
   if (!getSettingsSync().autoRefreshStats) return;
 
   const checkboxes = getProgressCheckboxes();
@@ -69,6 +74,7 @@ export function monitorCheckboxChanges() {
       e.target.matches('input[type="checkbox"][data-purpose="progress-toggle-button"]')
     ) {
       if (window.__uplusBulkActionRunning) return;
+      if (isStatsRefreshRunning()) return;
       if (!getSettingsSync().autoRefreshStats) return;
       updatePanelStatsFromToggle(e.target);
       lastState = readCheckboxStateMap();

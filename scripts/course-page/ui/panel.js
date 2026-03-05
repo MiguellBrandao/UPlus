@@ -29,6 +29,16 @@ let currentSettings = getSettingsSync();
 let unsubscribeSettings = null;
 let currentConfirmPrefs = { ...DEFAULT_CONFIRM_PREFS };
 
+function startStatsRefreshLock() {
+  const current = Number(window.__uplusStatsRefreshDepth || 0);
+  window.__uplusStatsRefreshDepth = current + 1;
+}
+
+function endStatsRefreshLock() {
+  const current = Number(window.__uplusStatsRefreshDepth || 0);
+  window.__uplusStatsRefreshDepth = Math.max(0, current - 1);
+}
+
 async function loadConfirmPrefs() {
   try {
     const result = await chrome.storage.local.get(CONFIRM_PREFS_KEY);
@@ -111,6 +121,7 @@ export async function updatePanelStats({
   const refreshBtn = panel.querySelector('#refresh-stats-btn');
   if (refreshBtn) refreshBtn.disabled = true;
   if (showLoading) showLoadingOverlay();
+  startStatsRefreshLock();
 
   try {
     const stats = await getCourseStats({ forceRefresh, expandBeforeScrape });
@@ -118,6 +129,7 @@ export async function updatePanelStats({
   } catch (error) {
     console.warn('Failed to update panel stats:', error);
   } finally {
+    endStatsRefreshLock();
     if (showLoading) hideLoadingOverlay();
     if (refreshBtn) refreshBtn.disabled = false;
   }

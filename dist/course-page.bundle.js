@@ -531,6 +531,14 @@
   var currentSettings = getSettingsSync();
   var unsubscribeSettings = null;
   var currentConfirmPrefs = { ...DEFAULT_CONFIRM_PREFS };
+  function startStatsRefreshLock() {
+    const current = Number(window.__uplusStatsRefreshDepth || 0);
+    window.__uplusStatsRefreshDepth = current + 1;
+  }
+  function endStatsRefreshLock() {
+    const current = Number(window.__uplusStatsRefreshDepth || 0);
+    window.__uplusStatsRefreshDepth = Math.max(0, current - 1);
+  }
   async function loadConfirmPrefs() {
     try {
       const result = await chrome.storage.local.get(CONFIRM_PREFS_KEY);
@@ -600,12 +608,14 @@
     const refreshBtn = panel.querySelector("#refresh-stats-btn");
     if (refreshBtn) refreshBtn.disabled = true;
     if (showLoading) showLoadingOverlay();
+    startStatsRefreshLock();
     try {
       const stats = await getCourseStats({ forceRefresh, expandBeforeScrape });
       applyStatsToPanel(panel, stats);
     } catch (error) {
       console.warn("Failed to update panel stats:", error);
     } finally {
+      endStatsRefreshLock();
       if (showLoading) hideLoadingOverlay();
       if (refreshBtn) refreshBtn.disabled = false;
     }
@@ -814,8 +824,12 @@
     });
     return map;
   }
+  function isStatsRefreshRunning() {
+    return Number(window.__uplusStatsRefreshDepth || 0) > 0;
+  }
   function applyStateDiff(previousMap, nextMap) {
     if (window.__uplusBulkActionRunning) return;
+    if (isStatsRefreshRunning()) return;
     if (!getSettingsSync().autoRefreshStats) return;
     const checkboxes = getProgressCheckboxes2();
     checkboxes.forEach((checkbox, index) => {
@@ -845,6 +859,7 @@
     document.body.addEventListener("change", (e) => {
       if (e.target && e.target.matches('input[type="checkbox"][data-purpose="progress-toggle-button"]')) {
         if (window.__uplusBulkActionRunning) return;
+        if (isStatsRefreshRunning()) return;
         if (!getSettingsSync().autoRefreshStats) return;
         updatePanelStatsFromToggle(e.target);
         lastState = readCheckboxStateMap();
