@@ -115,6 +115,49 @@
   color: #31d475;
 }
 
+.udemyplus-speed-control {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  overflow: hidden;
+  height: 2.6rem;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+#udemyplus-speed-wrapper {
+  margin-right: 8px;
+}
+
+.udemyplus-speed-btn,
+.udemyplus-speed-value {
+  border: 0;
+  background: transparent;
+  color: #f2f2f2;
+  cursor: pointer;
+  height: 100%;
+  line-height: 1;
+}
+
+.udemyplus-speed-btn {
+  width: 2.2rem;
+  font-size: 1.35rem;
+}
+
+.udemyplus-speed-value {
+  min-width: 5.4rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  padding: 0 0.8rem;
+  border-left: 1px solid rgba(255, 255, 255, 0.2);
+  border-right: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.udemyplus-speed-btn:hover,
+.udemyplus-speed-value:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
 .udemyplus-tooltip {
   position: absolute;
   bottom: 120%;

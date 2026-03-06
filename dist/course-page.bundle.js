@@ -1029,15 +1029,11 @@
     wrapper.className = "udemyplus-video-controls";
     wrapper.innerHTML = `
     <div class="udemyplus-icon popper-module--popper--mM5Ie" id="udemyplus-speed-wrapper">
-      <button
-        type="button"
-        id="udemyplus-speed"
-        class="ud-btn ud-btn-small ud-btn-ghost ud-btn-text-sm control-bar-dropdown--trigger--FnmP- control-bar-dropdown--trigger-dark--ZK26r control-bar-dropdown--trigger-small--ogRJ4"
-        aria-label="UdemyPlus speed control"
-      >
-        <i class="fas fa-gauge-high"></i>
-      </button>
-      <div class="udemyplus-tooltip">Speed (1.00x)</div>
+      <div class="udemyplus-speed-control" aria-label="UdemyPlus speed control">
+        <button type="button" id="udemyplus-speed-decrease" class="udemyplus-speed-btn" aria-label="Decrease speed">-</button>
+        <button type="button" id="udemyplus-speed" class="udemyplus-speed-value" aria-label="Reset speed to 1.0x">1.00x</button>
+        <button type="button" id="udemyplus-speed-increase" class="udemyplus-speed-btn" aria-label="Increase speed">+</button>
+      </div>
     </div>
     <div class="udemyplus-icon popper-module--popper--mM5Ie" id="udemyplus-pip-wrapper">
       <button
@@ -1224,8 +1220,11 @@
   // scripts/course-page/features/video/speedControl.js
   function setupSpeedControl(video) {
     const speedWrapper = document.getElementById("udemyplus-speed-wrapper");
+    const decreaseBtn = document.getElementById("udemyplus-speed-decrease");
+    const increaseBtn = document.getElementById("udemyplus-speed-increase");
+    const speedValueBtn = document.getElementById("udemyplus-speed");
     if (!speedWrapper) return;
-    const speedTooltip = speedWrapper.querySelector(".udemyplus-tooltip");
+    if (!decreaseBtn || !increaseBtn || !speedValueBtn) return;
     let applyingSpeed = false;
     const getCurrentVideo = () => document.querySelector("video") || video;
     const applySpeed = (rate) => {
@@ -1234,7 +1233,7 @@
       applyingSpeed = true;
       currentVideo.playbackRate = rate;
       applyingSpeed = false;
-      if (speedTooltip) speedTooltip.textContent = `Speed (${currentVideo.playbackRate.toFixed(2)}x)`;
+      speedValueBtn.textContent = `${currentVideo.playbackRate.toFixed(2)}x`;
     };
     applySpeed(videoStateService.getPreferredPlaybackRate());
     const enforcePreferredSpeed = () => {
@@ -1264,7 +1263,19 @@
       videoStateService.setPreferredPlaybackRate(nextRate);
       applySpeed(videoStateService.getPreferredPlaybackRate());
     });
-    speedWrapper.addEventListener("click", () => {
+    decreaseBtn.addEventListener("click", () => {
+      const currentVideo = getCurrentVideo();
+      if (!currentVideo) return;
+      videoStateService.setPreferredPlaybackRate(currentVideo.playbackRate - 0.1);
+      applySpeed(videoStateService.getPreferredPlaybackRate());
+    });
+    increaseBtn.addEventListener("click", () => {
+      const currentVideo = getCurrentVideo();
+      if (!currentVideo) return;
+      videoStateService.setPreferredPlaybackRate(currentVideo.playbackRate + 0.1);
+      applySpeed(videoStateService.getPreferredPlaybackRate());
+    });
+    speedValueBtn.addEventListener("click", () => {
       videoStateService.setPreferredPlaybackRate(1);
       applySpeed(videoStateService.getPreferredPlaybackRate());
     });
@@ -1660,9 +1671,9 @@
     const nextRate = video.playbackRate + step;
     videoStateService.setPreferredPlaybackRate(nextRate);
     video.playbackRate = videoStateService.getPreferredPlaybackRate();
-    const tooltip = document.querySelector("#udemyplus-speed-wrapper .udemyplus-tooltip");
-    if (tooltip) {
-      tooltip.textContent = `Speed (${video.playbackRate.toFixed(2)}x)`;
+    const speedValue = document.getElementById("udemyplus-speed");
+    if (speedValue) {
+      speedValue.textContent = `${video.playbackRate.toFixed(2)}x`;
     }
     return true;
   }

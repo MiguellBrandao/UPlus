@@ -2,8 +2,11 @@ import { videoStateService } from '../../services/videoState.js';
 
 export function setupSpeedControl(video) {
   const speedWrapper = document.getElementById('udemyplus-speed-wrapper');
+  const decreaseBtn = document.getElementById('udemyplus-speed-decrease');
+  const increaseBtn = document.getElementById('udemyplus-speed-increase');
+  const speedValueBtn = document.getElementById('udemyplus-speed');
   if (!speedWrapper) return;
-  const speedTooltip = speedWrapper.querySelector('.udemyplus-tooltip');
+  if (!decreaseBtn || !increaseBtn || !speedValueBtn) return;
   let applyingSpeed = false;
 
   const getCurrentVideo = () => document.querySelector('video') || video;
@@ -15,7 +18,7 @@ export function setupSpeedControl(video) {
     applyingSpeed = true;
     currentVideo.playbackRate = rate;
     applyingSpeed = false;
-    if (speedTooltip) speedTooltip.textContent = `Speed (${currentVideo.playbackRate.toFixed(2)}x)`;
+    speedValueBtn.textContent = `${currentVideo.playbackRate.toFixed(2)}x`;
   };
 
   applySpeed(videoStateService.getPreferredPlaybackRate());
@@ -54,7 +57,23 @@ export function setupSpeedControl(video) {
     applySpeed(videoStateService.getPreferredPlaybackRate());
   });
 
-  speedWrapper.addEventListener('click', () => {
+  decreaseBtn.addEventListener('click', () => {
+    const currentVideo = getCurrentVideo();
+    if (!currentVideo) return;
+
+    videoStateService.setPreferredPlaybackRate(currentVideo.playbackRate - 0.1);
+    applySpeed(videoStateService.getPreferredPlaybackRate());
+  });
+
+  increaseBtn.addEventListener('click', () => {
+    const currentVideo = getCurrentVideo();
+    if (!currentVideo) return;
+
+    videoStateService.setPreferredPlaybackRate(currentVideo.playbackRate + 0.1);
+    applySpeed(videoStateService.getPreferredPlaybackRate());
+  });
+
+  speedValueBtn.addEventListener('click', () => {
     videoStateService.setPreferredPlaybackRate(1);
     applySpeed(videoStateService.getPreferredPlaybackRate());
   });

@@ -7,15 +7,11 @@ export function createControlsUI(nativeControlsBar, { beforeNode = null, afterNo
 
   wrapper.innerHTML = `
     <div class="udemyplus-icon popper-module--popper--mM5Ie" id="udemyplus-speed-wrapper">
-      <button
-        type="button"
-        id="udemyplus-speed"
-        class="ud-btn ud-btn-small ud-btn-ghost ud-btn-text-sm control-bar-dropdown--trigger--FnmP- control-bar-dropdown--trigger-dark--ZK26r control-bar-dropdown--trigger-small--ogRJ4"
-        aria-label="UdemyPlus speed control"
-      >
-        <i class="fas fa-gauge-high"></i>
-      </button>
-      <div class="udemyplus-tooltip">Speed (1.00x)</div>
+      <div class="udemyplus-speed-control" aria-label="UdemyPlus speed control">
+        <button type="button" id="udemyplus-speed-decrease" class="udemyplus-speed-btn" aria-label="Decrease speed">-</button>
+        <button type="button" id="udemyplus-speed" class="udemyplus-speed-value" aria-label="Reset speed to 1.0x">1.00x</button>
+        <button type="button" id="udemyplus-speed-increase" class="udemyplus-speed-btn" aria-label="Increase speed">+</button>
+      </div>
     </div>
     <div class="udemyplus-icon popper-module--popper--mM5Ie" id="udemyplus-pip-wrapper">
       <button

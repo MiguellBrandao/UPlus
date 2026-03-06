@@ -21,9 +21,9 @@ function adjustVideoSpeed(step) {
   videoStateService.setPreferredPlaybackRate(nextRate);
   video.playbackRate = videoStateService.getPreferredPlaybackRate();
 
-  const tooltip = document.querySelector('#udemyplus-speed-wrapper .udemyplus-tooltip');
-  if (tooltip) {
-    tooltip.textContent = `Speed (${video.playbackRate.toFixed(2)}x)`;
+  const speedValue = document.getElementById('udemyplus-speed');
+  if (speedValue) {
+    speedValue.textContent = `${video.playbackRate.toFixed(2)}x`;
   }
 
   return true;
