@@ -124,7 +124,7 @@
   color: #fff;
   padding: 4px 8px;
   border-radius: 6px;
-  font-size: 1.05rem;
+  font-size: 1.2rem;
   white-space: nowrap;
   opacity: 0;
   transition: opacity 0.2s ease-in-out;
@@ -147,6 +147,12 @@ button.uplus-section-progress {
 
 button.uplus-section-not-started {
   color: #b23a3a !important;
+}
+
+/* Hide Udemy native playback speed control to avoid conflicts with UPlus speed state. */
+[data-purpose='playback-rate-button'],
+.playback-rate--playback-rate--FfV7X {
+  display: none !important;
 }
 
 /* Confirm Modal */

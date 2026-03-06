@@ -1226,16 +1226,34 @@
     const speedWrapper = document.getElementById("udemyplus-speed-wrapper");
     if (!speedWrapper) return;
     const speedTooltip = speedWrapper.querySelector(".udemyplus-tooltip");
+    let applyingSpeed = false;
     const getCurrentVideo = () => document.querySelector("video") || video;
     const applySpeed = (rate) => {
       const currentVideo = getCurrentVideo();
       if (!currentVideo) return;
+      applyingSpeed = true;
       currentVideo.playbackRate = rate;
+      applyingSpeed = false;
       if (speedTooltip) speedTooltip.textContent = `Speed (${currentVideo.playbackRate.toFixed(2)}x)`;
     };
     applySpeed(videoStateService.getPreferredPlaybackRate());
-    video.addEventListener("loadedmetadata", () => {
+    const enforcePreferredSpeed = () => {
       applySpeed(videoStateService.getPreferredPlaybackRate());
+    };
+    video.addEventListener("loadedmetadata", enforcePreferredSpeed);
+    video.addEventListener("play", () => {
+      setTimeout(enforcePreferredSpeed, 40);
+    });
+    video.addEventListener("playing", () => {
+      setTimeout(enforcePreferredSpeed, 40);
+    });
+    video.addEventListener("ratechange", () => {
+      if (applyingSpeed) return;
+      const currentVideo = getCurrentVideo();
+      if (!currentVideo) return;
+      const preferred = videoStateService.getPreferredPlaybackRate();
+      if (Math.abs(currentVideo.playbackRate - preferred) < 0.01) return;
+      setTimeout(enforcePreferredSpeed, 20);
     });
     speedWrapper.addEventListener("wheel", (e) => {
       e.preventDefault();
