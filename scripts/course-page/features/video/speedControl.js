@@ -1,5 +1,13 @@
 import { videoStateService } from '../../services/videoState.js';
 
+const speedBoundVideos = new WeakSet();
+
+function updateSpeedLabel(rate) {
+  const speedValueBtn = document.getElementById('udemyplus-speed');
+  if (!speedValueBtn) return;
+  speedValueBtn.textContent = `${rate.toFixed(2)}x`;
+}
+
 export function setupSpeedControl(video) {
   const speedWrapper = document.getElementById('udemyplus-speed-wrapper');
   const decreaseBtn = document.getElementById('udemyplus-speed-decrease');
@@ -7,44 +15,32 @@ export function setupSpeedControl(video) {
   const speedValueBtn = document.getElementById('udemyplus-speed');
   if (!speedWrapper) return;
   if (!decreaseBtn || !increaseBtn || !speedValueBtn) return;
-  let applyingSpeed = false;
 
   const getCurrentVideo = () => document.querySelector('video') || video;
 
-  const applySpeed = rate => {
+  const applyPreferredSpeed = () => {
     const currentVideo = getCurrentVideo();
     if (!currentVideo) return;
-
-    applyingSpeed = true;
-    currentVideo.playbackRate = rate;
-    applyingSpeed = false;
-    speedValueBtn.textContent = `${currentVideo.playbackRate.toFixed(2)}x`;
-  };
-
-  applySpeed(videoStateService.getPreferredPlaybackRate());
-
-  // Udemy may swap media source on lecture change while keeping the same player shell.
-  const enforcePreferredSpeed = () => {
-    applySpeed(videoStateService.getPreferredPlaybackRate());
-  };
-
-  video.addEventListener('loadedmetadata', enforcePreferredSpeed);
-  video.addEventListener('play', () => {
-    // Udemy may reset rate on resume; enforce right after playback starts.
-    setTimeout(enforcePreferredSpeed, 40);
-  });
-  video.addEventListener('playing', () => {
-    setTimeout(enforcePreferredSpeed, 40);
-  });
-  video.addEventListener('ratechange', () => {
-    if (applyingSpeed) return;
-    const currentVideo = getCurrentVideo();
-    if (!currentVideo) return;
-
     const preferred = videoStateService.getPreferredPlaybackRate();
-    if (Math.abs(currentVideo.playbackRate - preferred) < 0.01) return;
-    setTimeout(enforcePreferredSpeed, 20);
-  });
+    currentVideo.playbackRate = preferred;
+    updateSpeedLabel(currentVideo.playbackRate);
+  };
+
+  const applyCurrentRate = rate => {
+    const currentVideo = getCurrentVideo();
+    if (!currentVideo) return;
+    currentVideo.playbackRate = rate;
+    updateSpeedLabel(currentVideo.playbackRate);
+  };
+
+  applyPreferredSpeed();
+
+  if (!speedBoundVideos.has(video)) {
+    speedBoundVideos.add(video);
+    video.addEventListener('loadedmetadata', applyPreferredSpeed);
+    video.addEventListener('play', () => setTimeout(applyPreferredSpeed, 60));
+    video.addEventListener('playing', () => setTimeout(applyPreferredSpeed, 60));
+  }
 
   speedWrapper.addEventListener('wheel', e => {
     e.preventDefault();
@@ -54,7 +50,7 @@ export function setupSpeedControl(video) {
     const increment = 0.1;
     const nextRate = currentVideo.playbackRate + (e.deltaY < 0 ? increment : -increment);
     videoStateService.setPreferredPlaybackRate(nextRate);
-    applySpeed(videoStateService.getPreferredPlaybackRate());
+    applyCurrentRate(videoStateService.getPreferredPlaybackRate());
   });
 
   decreaseBtn.addEventListener('click', () => {
@@ -62,7 +58,7 @@ export function setupSpeedControl(video) {
     if (!currentVideo) return;
 
     videoStateService.setPreferredPlaybackRate(currentVideo.playbackRate - 0.1);
-    applySpeed(videoStateService.getPreferredPlaybackRate());
+    applyCurrentRate(videoStateService.getPreferredPlaybackRate());
   });
 
   increaseBtn.addEventListener('click', () => {
@@ -70,11 +66,11 @@ export function setupSpeedControl(video) {
     if (!currentVideo) return;
 
     videoStateService.setPreferredPlaybackRate(currentVideo.playbackRate + 0.1);
-    applySpeed(videoStateService.getPreferredPlaybackRate());
+    applyCurrentRate(videoStateService.getPreferredPlaybackRate());
   });
 
   speedValueBtn.addEventListener('click', () => {
     videoStateService.setPreferredPlaybackRate(1);
-    applySpeed(videoStateService.getPreferredPlaybackRate());
+    applyCurrentRate(videoStateService.getPreferredPlaybackRate());
   });
 }
